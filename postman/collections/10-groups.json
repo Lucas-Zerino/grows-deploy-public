@@ -1,0 +1,371 @@
+{
+	"info": {
+		"_postman_id": "groups-collection-2025",
+		"name": "Grupos",
+		"description": "Gerenciamento de grupos - Padrão UAZAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Create Group",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Meu Novo Grupo\",\n  \"participants\": [\n    \"5521987905995\",\n    \"5511912345678\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/create",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"create"
+					]
+				},
+				"description": "Criar um novo grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Group Info",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363153742561022@g.us\",\n  \"getInviteLink\": true,\n  \"getRequestsParticipants\": false,\n  \"force\": false\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/info",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"info"
+					]
+				},
+				"description": "Obter informações detalhadas de um grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Invite Info",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"inviteCode\": \"https://chat.whatsapp.com/IYnl5Zg9bUcJD32rJrDzO7\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/inviteInfo",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"inviteInfo"
+					]
+				},
+				"description": "Obter informações de um grupo pelo código de convite"
+			},
+			"response": []
+		},
+		{
+			"name": "Join Group",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"inviteCode\": \"https://chat.whatsapp.com/IYnl5Zg9bUcJD32rJrDzO7\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/join",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"join"
+					]
+				},
+				"description": "Entrar em um grupo usando código de convite"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Invite Link",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/group/invitelink/120363153742561022@g.us",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"invitelink",
+						"120363153742561022@g.us"
+					]
+				},
+				"description": "Gerar link de convite para um grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Description",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363339858396166@g.us\",\n  \"description\": \"Grupo oficial de suporte\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateDescription",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateDescription"
+					]
+				},
+				"description": "Atualizar descrição do grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Name",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363339858396166@g.us\",\n  \"name\": \"Grupo de Suporte\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateName",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateName"
+					]
+				},
+				"description": "Atualizar nome do grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Image",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\",\n  \"image\": \"https://example.com/image.jpg\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateImage",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateImage"
+					]
+				},
+				"description": "Atualizar imagem do grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Participants - Add",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\",\n  \"action\": \"add\",\n  \"participants\": [\n    \"5511912345678\",\n    \"5511987654321\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateParticipants",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateParticipants"
+					]
+				},
+				"description": "Adicionar participantes ao grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Participants - Remove",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\",\n  \"action\": \"remove\",\n  \"participants\": [\n    \"5511912345678\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateParticipants",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateParticipants"
+					]
+				},
+				"description": "Remover participantes do grupo"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Participants - Promote",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\",\n  \"action\": \"promote\",\n  \"participants\": [\n    \"5511912345678\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateParticipants",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateParticipants"
+					]
+				},
+				"description": "Promover participantes a administradores"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Participants - Demote",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\",\n  \"action\": \"demote\",\n  \"participants\": [\n    \"5511912345678\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/updateParticipants",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"updateParticipants"
+					]
+				},
+				"description": "Rebaixar administradores a participantes"
+			},
+			"response": []
+		},
+		{
+			"name": "Leave Group",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"groupjid\": \"120363308883996631@g.us\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/group/leave",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"group",
+						"leave"
+					]
+				},
+				"description": "Sair do grupo"
+			},
+			"response": []
+		}
+	]
+}

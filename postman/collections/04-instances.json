@@ -1,0 +1,483 @@
+{
+    "info": {
+        "_postman_id": "instances-unified-2025",
+        "name": "Instancias",
+        "description": "Gerenciamento unificado de instâncias: CRUD + Operações (detecta provider automaticamente)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "CRUD - Gerenciar Instancias",
+            "description": "Criar, listar, buscar e deletar instâncias (usando company_token)",
+            "item": [
+                {
+                    "name": "Criar Instancia",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('instance_token', response.data.token);",
+                                    "    pm.environment.set('instance_id', response.data.id);",
+                                    "    pm.environment.set('instance_name', response.data.instance_name);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{company_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"instance_name\": \"vendas\",\n  \"phone_number\": \"5511999999999\",\n  \"webhook_url\": \"https://meuapp.com/webhook\",\n  \"provider_id\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/instances",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "instances"]
+                        },
+                        "description": "Cria uma nova instância.\n\n**IMPORTANTE**: O token da instância é retornado em `data.token` e deve ser usado nas rotas de operação (/instance/*)"
+                    }
+                },
+                {
+                    "name": "Listar Instancias",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{company_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/instances",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "instances"]
+                        },
+                        "description": "Lista todas as instâncias da empresa."
+                    }
+                },
+                {
+                    "name": "Buscar Instancia",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{company_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/instances/{{instance_id}}",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "instances", "{{instance_id}}"]
+                        },
+                        "description": "Busca uma instância específica por ID."
+                    }
+                },
+                {
+                    "name": "Deletar Instancia",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{company_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/instances/{{instance_id}}",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "instances", "{{instance_id}}"]
+                        },
+                        "description": "Deleta uma instância específica por ID."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Operacoes de Instancia",
+            "description": "Operações unificadas de instância (detecta provider automaticamente)",
+            "item": [
+                {
+                    "name": "Conectar Instancia",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"5511999999999\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/instance/connect",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "connect"]
+                        },
+                        "description": "Conectar instância ao WhatsApp\n\n**Parâmetros:**\n- `phone` (opcional): Número de telefone no formato internacional\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Desconectar Instancia",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/instance/disconnect",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "disconnect"]
+                        },
+                        "description": "Desconectar instância do WhatsApp\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Verificar Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/instance/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "status"]
+                        },
+                        "description": "Verificar status da instância\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Buscar QR Code",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/instance/qrcode",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "qrcode"]
+                        },
+                        "description": "Buscar QR code da instância\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Buscar Imagem QR Code",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/instance/qrcode/image",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "qrcode", "image"]
+                        },
+                        "description": "Buscar imagem do QR code\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Imagem PNG"
+                    }
+                },
+                {
+                    "name": "Atualizar Nome",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Instância Atualizada\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/instance/name",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "name"]
+                        },
+                        "description": "Atualizar nome da instância\n\n**Parâmetros:**\n- `name` (obrigatório): Novo nome da instância\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Buscar Configuracoes de Privacidade",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/instance/privacy",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "privacy"]
+                        },
+                        "description": "Buscar configurações de privacidade\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Atualizar Configuracoes de Privacidade",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"readreceipts\": \"all\",\n  \"groups\": \"all\",\n  \"calladd\": \"all\",\n  \"last\": \"all\",\n  \"status\": \"all\",\n  \"profile\": \"all\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/instance/privacy",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "privacy"]
+                        },
+                        "description": "Atualizar configurações de privacidade\n\n**Parâmetros:**\n- `readreceipts`: Configuração de confirmação de leitura\n- `groups`: Configuração de grupos\n- `calladd`: Configuração de chamadas\n- `last`: Configuração de última visualização\n- `status`: Configuração de status\n- `profile`: Configuração de perfil\n\n**Valores possíveis:** `all`, `contacts`, `contact_blacklist`, `none`\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Atualizar Status de Presença",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"available\",\n  \"message\": \"Online\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/instance/presence",
+                            "host": ["{{base_url}}"],
+                            "path": ["instance", "presence"]
+                        },
+                        "description": "Atualizar status de presença\n\n**Parâmetros:**\n- `status` (obrigatório): Status de presença\n- `message` (opcional): Mensagem personalizada\n\n**Valores de status:** `available`, `composing`, `recording`, `paused`\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Envio de Mensagens",
+            "description": "Envio unificado de mensagens (detecta provider automaticamente)",
+            "item": [
+                {
+                    "name": "Enviar Texto",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"to\": \"5511999999999\",\n  \"message\": \"Olá! Esta é uma mensagem de teste.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/send/text",
+                            "host": ["{{base_url}}"],
+                            "path": ["send", "text"]
+                        },
+                        "description": "Enviar mensagem de texto\n\n**Parâmetros:**\n- `to` (obrigatório): Número de telefone do destinatário\n- `message` (obrigatório): Texto da mensagem\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Enviar Mídia",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"to\": \"5511999999999\",\n  \"media\": \"https://example.com/image.jpg\",\n  \"type\": \"image\",\n  \"caption\": \"Legenda da imagem\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/send/media",
+                            "host": ["{{base_url}}"],
+                            "path": ["send", "media"]
+                        },
+                        "description": "Enviar mensagem de mídia\n\n**Parâmetros:**\n- `to` (obrigatório): Número de telefone do destinatário\n- `media` (obrigatório): URL da mídia\n- `type` (obrigatório): Tipo da mídia (image, video, audio, document)\n- `caption` (opcional): Legenda da mídia\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Enviar Contato",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"to\": \"5511999999999\",\n  \"contact\": {\n    \"name\": \"João Silva\",\n    \"phone\": \"5511888888888\"\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/send/contact",
+                            "host": ["{{base_url}}"],
+                            "path": ["send", "contact"]
+                        },
+                        "description": "Enviar contato\n\n**Parâmetros:**\n- `to` (obrigatório): Número de telefone do destinatário\n- `contact` (obrigatório): Dados do contato\n  - `name`: Nome do contato\n  - `phone`: Telefone do contato\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                },
+                {
+                    "name": "Enviar Localização",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{instance_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"to\": \"5511999999999\",\n  \"latitude\": -23.5505,\n  \"longitude\": -46.6333,\n  \"name\": \"São Paulo\",\n  \"address\": \"Centro de São Paulo\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/send/location",
+                            "host": ["{{base_url}}"],
+                            "path": ["send", "location"]
+                        },
+                        "description": "Enviar localização\n\n**Parâmetros:**\n- `to` (obrigatório): Número de telefone do destinatário\n- `latitude` (obrigatório): Latitude da localização\n- `longitude` (obrigatório): Longitude da localização\n- `name` (opcional): Nome do local\n- `address` (opcional): Endereço do local\n\n**Detecção automática:** O backend detecta automaticamente se é UAZAPI ou WAHA baseado na instância\n\n**Resposta:** Formato unificado UAZAPI"
+                    }
+                }
+            ]
+        }
+    ]
+}

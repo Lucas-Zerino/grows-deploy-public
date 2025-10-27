@@ -1,0 +1,58 @@
+{
+	"info": {
+		"_postman_id": "events-collection-2025",
+		"name": "Events",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Listar Eventos",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{company_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/events?limit=50&offset=0",
+					"host": ["{{base_url}}"],
+					"path": ["api", "events"],
+					"query": [
+						{
+							"key": "limit",
+							"value": "50"
+						},
+						{
+							"key": "offset",
+							"value": "0"
+						}
+					]
+				},
+				"description": "Lista os eventos recebidos (mensagens lidas, status de entrega, etc)"
+			}
+		},
+		{
+			"name": "Buscar Evento",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{company_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/events/{{event_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "events", "{{event_id}}"]
+				},
+				"description": "Busca os detalhes de um evento específico"
+			}
+		}
+	]
+}
+

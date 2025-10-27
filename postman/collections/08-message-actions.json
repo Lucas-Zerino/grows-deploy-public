@@ -1,0 +1,198 @@
+{
+	"info": {
+		"_postman_id": "message-actions-2025",
+		"name": "Acoes na mensagem e Buscar",
+		"description": "Acoes em mensagens e busca - Padrao UAZAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Update Presence",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"number\": \"5511999999999\",\n  \"presence\": \"composing\",\n  \"delay\": 30000\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/message/presence",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"message",
+						"presence"
+					]
+				},
+				"description": "Enviar atualização de presença"
+			},
+			"response": []
+		},
+		{
+			"name": "Send Reaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"number\": \"5511999999999\",\n  \"text\": \"👍\",\n  \"id\": \"3EB0538DA65A59F6D8A251\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/message/react",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"message",
+						"react"
+					]
+				},
+				"description": "Enviar reação"
+			},
+			"response": []
+		},
+		{
+			"name": "Mark as Read",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"id\": [\n    \"62AD1AD844E518180227BF68DA7ED710\",\n    \"ECB9DE48EB41F77BFA8491BFA8D6EF9B\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/message/markread",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"message",
+						"markread"
+					]
+				},
+				"description": "Marcar mensagens como lidas"
+			},
+			"response": []
+		},
+		{
+			"name": "Download File",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"id\": \"7EB0F01D7244B421048F0706368376E0\",\n  \"return_base64\": false,\n  \"generate_mp3\": true,\n  \"return_link\": true,\n  \"transcribe\": false,\n  \"download_quoted\": false\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/message/download",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"message",
+						"download"
+					]
+				},
+				"description": "Baixar arquivo de uma mensagem"
+			},
+			"response": []
+		},
+		{
+			"name": "Forward Message",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"number\": \"5511999999999\",\n  \"messageId\": \"3EB0538DA65A59F6D8A251\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/message/forward",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"message",
+						"forward"
+					]
+				},
+				"description": "Encaminhar mensagem"
+			},
+			"response": []
+		},
+		{
+			"name": "List Messages",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{company_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages?limit=50&offset=0",
+					"host": ["{{base_url}}"],
+					"path": ["api", "messages"],
+					"query": [
+						{
+							"key": "limit",
+							"value": "50"
+						},
+						{
+							"key": "offset",
+							"value": "0"
+						}
+					]
+				},
+				"description": "Lista o histórico de mensagens da empresa"
+			}
+		},
+		{
+			"name": "Get Message",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{company_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages/{{message_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "messages", "{{message_id}}"]
+				},
+				"description": "Busca os detalhes de uma mensagem específica"
+			}
+		}
+	]
+}

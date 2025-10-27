@@ -1,0 +1,346 @@
+# GrowHub Gateway - API Examples
+# Use with REST Client extension in VSCode or similar
+
+### Variables
+@baseUrl = http://localhost:8000
+@adminEmail = admin@growhub.com
+@adminPassword = Admin@123456
+@adminToken = YOUR_ADMIN_TOKEN_HERE
+@companyToken = YOUR_COMPANY_TOKEN_HERE
+
+### ==========================================================
+### AUTHENTICATION
+### ==========================================================
+
+### Login Superadmin (Email/Senha)
+POST {{baseUrl}}/api/admin/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Get Admin Info
+GET {{baseUrl}}/api/admin/me
+Authorization: Bearer {{adminToken}}
+
+### Change Password
+POST {{baseUrl}}/api/admin/change-password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "current_password": "Admin@123456",
+  "new_password": "NovaSenha@123456"
+}
+
+### ==========================================================
+### ADMIN ENDPOINTS (Superadmin only)
+### ==========================================================
+
+### Health Check (Public)
+GET {{baseUrl}}/health
+
+### Admin Health Check
+GET {{baseUrl}}/api/admin/health
+Authorization: Bearer {{adminToken}}
+
+### Create Company
+POST {{baseUrl}}/api/admin/companies
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Minha Empresa"
+}
+
+### List Companies
+GET {{baseUrl}}/api/admin/companies
+Authorization: Bearer {{adminToken}}
+
+### Get Company
+GET {{baseUrl}}/api/admin/companies/1
+Authorization: Bearer {{adminToken}}
+
+### Update Company Status
+PUT {{baseUrl}}/api/admin/companies/1/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### Delete Company
+DELETE {{baseUrl}}/api/admin/companies/1
+Authorization: Bearer {{adminToken}}
+
+### Create Provider (WAHA)
+POST {{baseUrl}}/api/admin/providers
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "type": "waha",
+  "name": "WAHA Server 1",
+  "base_url": "http://localhost:3000",
+  "api_key": null,
+  "max_instances": 100
+}
+
+### Create Provider (UAZAPI)
+POST {{baseUrl}}/api/admin/providers
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "type": "uazapi",
+  "name": "UAZAPI Server 1",
+  "base_url": "https://api.uazapi.com",
+  "api_key": "your-secret-key",
+  "max_instances": 100
+}
+
+### List Providers
+GET {{baseUrl}}/api/admin/providers
+Authorization: Bearer {{adminToken}}
+
+### Get Provider
+GET {{baseUrl}}/api/admin/providers/1
+Authorization: Bearer {{adminToken}}
+
+### Update Provider
+PUT {{baseUrl}}/api/admin/providers/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "is_active": true,
+  "max_instances": 200
+}
+
+### Delete Provider
+DELETE {{baseUrl}}/api/admin/providers/1
+Authorization: Bearer {{adminToken}}
+
+### ==========================================================
+### COMPANY ENDPOINTS (Authenticated)
+### ==========================================================
+
+### Create Instance
+POST {{baseUrl}}/api/instances
+Authorization: Bearer {{companyToken}}
+Content-Type: application/json
+
+{
+  "instance_name": "vendas",
+  "phone_number": "5511999999999",
+  "webhook_url": "https://seu-app.com/webhook"
+}
+
+### List Instances
+GET {{baseUrl}}/api/instances
+Authorization: Bearer {{companyToken}}
+
+### Get Instance
+GET {{baseUrl}}/api/instances/1
+Authorization: Bearer {{companyToken}}
+
+### Get QR Code
+GET {{baseUrl}}/api/instances/1/qrcode
+Authorization: Bearer {{companyToken}}
+
+### Delete Instance
+DELETE {{baseUrl}}/api/instances/1
+Authorization: Bearer {{companyToken}}
+
+### Send Text Message
+POST {{baseUrl}}/api/messages/send
+Authorization: Bearer {{companyToken}}
+Content-Type: application/json
+
+{
+  "instance_id": 1,
+  "phone_to": "5511888888888",
+  "message_type": "text",
+  "content": "Olá! Esta é uma mensagem de teste do GrowHub Gateway.",
+  "priority": 5
+}
+
+### Send High Priority Message
+POST {{baseUrl}}/api/messages/send
+Authorization: Bearer {{companyToken}}
+Content-Type: application/json
+
+{
+  "instance_id": 1,
+  "phone_to": "5511888888888",
+  "message_type": "text",
+  "content": "URGENTE: Mensagem com alta prioridade",
+  "priority": 10
+}
+
+### Send Image Message
+POST {{baseUrl}}/api/messages/send
+Authorization: Bearer {{companyToken}}
+Content-Type: application/json
+
+{
+  "instance_id": 1,
+  "phone_to": "5511888888888",
+  "message_type": "image",
+  "media_url": "https://example.com/image.jpg",
+  "content": "Legenda da imagem",
+  "priority": 5
+}
+
+### Send Video Message
+POST {{baseUrl}}/api/messages/send
+Authorization: Bearer {{companyToken}}
+Content-Type: application/json
+
+{
+  "instance_id": 1,
+  "phone_to": "5511888888888",
+  "message_type": "video",
+  "media_url": "https://example.com/video.mp4",
+  "content": "Confira este vídeo!",
+  "priority": 5
+}
+
+### List All Messages
+GET {{baseUrl}}/api/messages?limit=50&offset=0
+Authorization: Bearer {{companyToken}}
+
+### List Messages by Instance
+GET {{baseUrl}}/api/messages?instance_id=1&limit=20
+Authorization: Bearer {{companyToken}}
+
+### Get Message
+GET {{baseUrl}}/api/messages/1
+Authorization: Bearer {{companyToken}}
+
+### List All Events
+GET {{baseUrl}}/api/events?limit=50&offset=0
+Authorization: Bearer {{companyToken}}
+
+### List Events by Instance
+GET {{baseUrl}}/api/events?instance_id=1&limit=20
+Authorization: Bearer {{companyToken}}
+
+### Get Event
+GET {{baseUrl}}/api/events/1
+Authorization: Bearer {{companyToken}}
+
+### ==========================================================
+### WEBHOOK SIMULATION (Para testes)
+### ==========================================================
+
+### Webhook - Message Received (WAHA format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "event": "message",
+  "session": "vendas",
+  "payload": {
+    "id": "true_5511888888888@c.us_3EB0123456789ABCDEF",
+    "timestamp": 1634567890,
+    "from": "5511888888888@c.us",
+    "type": "text",
+    "body": "Olá! Recebi sua mensagem.",
+    "fromMe": false,
+    "hasMedia": false
+  }
+}
+
+### Webhook - Message Delivered (WAHA format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "event": "message.ack",
+  "session": "vendas",
+  "payload": {
+    "id": "true_5511888888888@c.us_3EB0123456789ABCDEF",
+    "ack": 2,
+    "timestamp": 1634567890
+  }
+}
+
+### Webhook - Message Read (WAHA format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "event": "message.ack",
+  "session": "vendas",
+  "payload": {
+    "id": "true_5511888888888@c.us_3EB0123456789ABCDEF",
+    "ack": 3,
+    "timestamp": 1634567890
+  }
+}
+
+### Webhook - Connection Status (WAHA format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "event": "session.status",
+  "session": "vendas",
+  "payload": {
+    "status": "WORKING"
+  }
+}
+
+### Webhook - QR Code (WAHA format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "event": "qr",
+  "session": "vendas",
+  "payload": {
+    "qr": "data:image/png;base64,..."
+  }
+}
+
+### Webhook - Message Received (UAZAPI format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "type": "ReceivedCallback",
+  "instanceName": "vendas",
+  "data": {
+    "id": "message123",
+    "from": "5511888888888",
+    "type": "text",
+    "body": "Mensagem via UAZAPI",
+    "timestamp": 1634567890
+  }
+}
+
+### Webhook - Message Delivered (UAZAPI format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "type": "DeliveredCallback",
+  "instanceName": "vendas",
+  "messageId": "message123",
+  "timestamp": 1634567890
+}
+
+### Webhook - Message Read (UAZAPI format)
+POST {{baseUrl}}/webhook/1
+Content-Type: application/json
+
+{
+  "type": "ReadCallback",
+  "instanceName": "vendas",
+  "messageId": "message123",
+  "timestamp": 1634567890
+}

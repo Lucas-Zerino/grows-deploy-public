@@ -1,0 +1,201 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: growhub_postgres_dev
+    environment:
+      POSTGRES_DB: growhub_gateway
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - growhub_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: growhub_rabbitmq_dev
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data_dev:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - growhub_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  php-fpm:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_php_dev
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: growhub_nginx_dev
+    ports:
+      - "8001:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      - php-fpm
+    restart: unless-stopped
+
+  worker-outbound:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_worker_outbound_dev
+    command: php /var/www/html/workers/message_sender_worker.php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  worker-inbound:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_worker_inbound_dev
+    command: php /var/www/html/workers/event_processor_worker.php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  worker-outbox:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_worker_outbox_dev
+    command: php /var/www/html/workers/outbox_processor_worker.php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  worker-health:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_worker_health_dev
+    command: php /var/www/html/workers/health_check_worker.php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  # Container de setup automático (roda uma vez e para)
+  setup:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_setup_dev
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
+      - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      php-fpm:
+        condition: service_started
+    env_file:
+      - .env
+    command: sh /var/www/html/docker/scripts/setup.sh
+    restart: "no"
+
+volumes:
+  postgres_data_dev:
+  rabbitmq_data_dev:
+  vendor_data:  # Volume isolado para dependências PHP (evita problemas Windows)
+
+networks:
+  growhub_network:
+    driver: bridge
+

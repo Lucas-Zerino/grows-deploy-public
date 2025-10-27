@@ -1,0 +1,230 @@
+{
+	"info": {
+		"_postman_id": "communities-collection-2025",
+		"name": "Comunidades",
+		"description": "Gerenciamento de comunidades - Padrão UAZAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Create Community",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Comunidade do Bairro\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/create",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"create"
+					]
+				},
+				"description": "Criar uma nova comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "List Communities",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/community/list",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"list"
+					]
+				},
+				"description": "Listar todas as comunidades"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Community Info",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/info",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"info"
+					]
+				},
+				"description": "Obter informações de uma comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "Edit Groups - Add",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\",\n  \"action\": \"add\",\n  \"groupjids\": [\n    \"120363324255083289@g.us\",\n    \"120363308883996631@g.us\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/editgroups",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"editgroups"
+					]
+				},
+				"description": "Adicionar grupos à comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "Edit Groups - Remove",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\",\n  \"action\": \"remove\",\n  \"groupjids\": [\n    \"120363308883996631@g.us\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/editgroups",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"editgroups"
+					]
+				},
+				"description": "Remover grupos da comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Description",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\",\n  \"description\": \"Comunidade oficial do bairro\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/updateDescription",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"updateDescription"
+					]
+				},
+				"description": "Atualizar descrição da comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Name",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\",\n  \"name\": \"Nova Comunidade do Bairro\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/updateName",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"updateName"
+					]
+				},
+				"description": "Atualizar nome da comunidade"
+			},
+			"response": []
+		},
+		{
+			"name": "Leave Community",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"community\": \"120363153742561022@g.us\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/community/leave",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"community",
+						"leave"
+					]
+				},
+				"description": "Sair da comunidade"
+			},
+			"response": []
+		}
+	]
+}

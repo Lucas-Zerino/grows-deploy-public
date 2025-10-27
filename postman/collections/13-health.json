@@ -1,0 +1,42 @@
+{
+	"info": {
+		"_postman_id": "health-collection-2025",
+		"name": "Health & Monitoring",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check (Público)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": ["{{base_url}}"],
+					"path": ["health"]
+				},
+				"description": "Endpoint público de health check (sem autenticação)"
+			}
+		},
+		{
+			"name": "Health Detalhado (Superadmin)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/admin/health",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "health"]
+				},
+				"description": "Retorna status detalhado:\n- Providers (healthy/unhealthy)\n- Filas RabbitMQ\n- Estatísticas do sistema"
+			}
+		}
+	]
+}
+

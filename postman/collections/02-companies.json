@@ -1,0 +1,132 @@
+{
+	"info": {
+		"_postman_id": "companies-collection-2025",
+		"name": "Companies - Superadmin",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Criar Empresa",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 201) {",
+							"    const response = pm.response.json();",
+							"    pm.environment.set('company_token', response.data.token);",
+							"    pm.environment.set('company_id', response.data.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Minha Empresa LTDA\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/admin/companies",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "companies"]
+				},
+				"description": "Cria uma nova empresa. O token é salvo automaticamente."
+			}
+		},
+		{
+			"name": "Listar Empresas",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/admin/companies",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "companies"]
+				}
+			}
+		},
+		{
+			"name": "Buscar Empresa",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/admin/companies/{{company_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "companies", "{{company_id}}"]
+				}
+			}
+		},
+		{
+			"name": "Atualizar Empresa",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Empresa Atualizada\",\n  \"status\": \"active\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/admin/companies/{{company_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "companies", "{{company_id}}"]
+				}
+			}
+		},
+		{
+			"name": "Deletar Empresa",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{superadmin_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/admin/companies/{{company_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "admin", "companies", "{{company_id}}"]
+				}
+			}
+		}
+	]
+}
+

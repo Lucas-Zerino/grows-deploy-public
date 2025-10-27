@@ -1,0 +1,201 @@
+{
+	"info": {
+		"_postman_id": "contacts-collection-2025",
+		"name": "Contatos",
+		"description": "Gerenciamento de contatos - Padrão UAZAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get All Contacts",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/contacts",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contacts"
+					]
+				},
+				"description": "Retorna lista de contatos do WhatsApp"
+			},
+			"response": []
+		},
+		{
+			"name": "Add Contact",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"5511999999999\",\n  \"name\": \"João Silva\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/contact/add",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contact",
+						"add"
+					]
+				},
+				"description": "Adiciona um contato à agenda"
+			},
+			"response": []
+		},
+		{
+			"name": "Remove Contact",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"5511999999999\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/contact/remove",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contact",
+						"remove"
+					]
+				},
+				"description": "Remove um contato da agenda"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Chat Details",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"number\": \"5511999999999\",\n  \"preview\": false\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/chat/details",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"chat",
+						"details"
+					]
+				},
+				"description": "Obter detalhes completos de um contato ou chat"
+			},
+			"response": []
+		},
+		{
+			"name": "Check Numbers",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"numbers\": [\n    \"5511999999999\",\n    \"5511888888888\",\n    \"123456789@g.us\"\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/chat/check",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"chat",
+						"check"
+					]
+				},
+				"description": "Verificar números no WhatsApp"
+			},
+			"response": []
+		},
+		{
+			"name": "Block Contact",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"5511999999999\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/contact/block",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contact",
+						"block"
+					]
+				},
+				"description": "Bloquear contato"
+			},
+			"response": []
+		},
+		{
+			"name": "Unblock Contact",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"5511999999999\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/contact/unblock",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"contact",
+						"unblock"
+					]
+				},
+				"description": "Desbloquear contato"
+			},
+			"response": []
+		}
+	]
+}

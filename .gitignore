@@ -1,0 +1,33 @@
+# Dependencies
+/vendor/
+
+# Environment
+.env
+.env.local
+.env.dev
+.env.prod
+
+# Logs
+/logs/*.log
+/logs/*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Composer
+composer.lock
+
+# Docker
+docker-compose.override.yml
+
+# Cache
+*.cache
+
