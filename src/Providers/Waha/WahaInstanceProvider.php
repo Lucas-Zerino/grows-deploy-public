@@ -45,6 +45,24 @@ class WahaInstanceProvider
                 'status' => $data['status'] ?? 'unknown'
             ]);
             
+            // Se o status é FAILED, tentar restart
+            if ($data['status'] === 'FAILED') {
+                Logger::warning('WAHA session failed, attempting restart', [
+                    'external_id' => $externalInstanceId,
+                    'status' => $data['status']
+                ]);
+                
+                $restartResult = $this->restartSession($externalInstanceId);
+                if (!$restartResult['success']) {
+                    return $restartResult;
+                }
+                
+                // Aguardar e verificar status novamente
+                sleep(3);
+                $response = $this->client->get("/api/sessions/{$externalInstanceId}");
+                $data = json_decode($response->getBody()->getContents(), true);
+            }
+            
             // Se passou telefone e a sessão não está em SCAN_QR_CODE, solicitar código de pareamento
             if ($phone && $data['status'] !== 'SCAN_QR_CODE') {
                 $authResult = $this->requestAuthCode($externalInstanceId, $phone);
@@ -163,7 +181,7 @@ class WahaInstanceProvider
     public function getStatus(string $externalInstanceId): array
     {
         try {
-            $response = $this->client->get("/api/sessions/{$externalInstanceId}/status");
+            $response = $this->client->get("/api/sessions/{$externalInstanceId}");
             $data = json_decode($response->getBody()->getContents(), true);
             
             $status = $data['status'] ?? 'UNKNOWN';
@@ -343,7 +361,7 @@ class WahaInstanceProvider
     private function requestAuthCode(string $externalInstanceId, string $phone): array
     {
         try {
-            $response = $this->client->get("/api/sessions/{$externalInstanceId}/auth/request-code");
+            $response = $this->client->get("/api/{$externalInstanceId}/auth/qr");
             
             $data = json_decode($response->getBody()->getContents(), true);
             
@@ -359,6 +377,53 @@ class WahaInstanceProvider
             ];
             
         } catch (GuzzleException $e) {
+            // Verificar se é erro 422 (status não esperado)
+            if ($e->getCode() === 422 || strpos($e->getMessage(), '422') !== false) {
+                Logger::warning('WAHA session status not expected, attempting restart', [
+                    'external_id' => $externalInstanceId,
+                    'phone' => $phone,
+                    'error' => $e->getMessage(),
+                ]);
+                
+                // Fazer restart da sessão
+                $restartResult = $this->restartSession($externalInstanceId);
+                if (!$restartResult['success']) {
+                    return $restartResult;
+                }
+                
+                // Aguardar um pouco para a sessão estabilizar
+                sleep(3);
+                
+                // Tentar novamente obter o QR code
+                try {
+                    $response = $this->client->get("/api/{$externalInstanceId}/auth/qr");
+                    $data = json_decode($response->getBody()->getContents(), true);
+                    
+                    Logger::info('WAHA auth code requested after restart', [
+                        'external_id' => $externalInstanceId,
+                        'phone' => $phone
+                    ]);
+                    
+                    return [
+                        'success' => true,
+                        'message' => 'Código de autenticação solicitado após restart',
+                        'data' => $data
+                    ];
+                    
+                } catch (GuzzleException $retryException) {
+                    Logger::error('WAHA request auth code failed after restart', [
+                        'external_id' => $externalInstanceId,
+                        'phone' => $phone,
+                        'error' => $retryException->getMessage(),
+                    ]);
+                    
+                    return [
+                        'success' => false,
+                        'message' => 'Erro ao solicitar código de autenticação após restart: ' . $retryException->getMessage()
+                    ];
+                }
+            }
+            
             Logger::error('WAHA request auth code failed', [
                 'external_id' => $externalInstanceId,
                 'phone' => $phone,

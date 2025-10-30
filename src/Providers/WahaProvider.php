@@ -48,7 +48,7 @@ class WahaProvider implements ProviderInterface
     /**
      * Criar instância
      */
-    public function createInstance(string $instanceName, ?string $instanceId = null): array
+    public function createInstance(string $instanceName, ?string $instanceId = null, array $webhooks = []): array
     {
         try {
             // Configurar webhook do backend se BACKEND_URL estiver configurado
@@ -56,39 +56,55 @@ class WahaProvider implements ProviderInterface
             $backendUrl = $_ENV['BACKEND_URL'] ?? null;
             
             if ($backendUrl && $instanceId) {
-                $payload['config'] = [
-                    'webhooks' => [
-                        [
-                            'url' => "{$backendUrl}/webhook/waha/{$instanceId}",
-                            'events' => [
-                                'session.status',            // ✨ Status da sessão
-                                'message',                   // ✨ Mensagens recebidas
-                                'message.reaction',          // ✨ Reações
-                                'message.any',               // ✨ Todas as mensagens
-                                'message.ack',               // ✨ Mensagens lidas/entregues
-                                'message.revoked',           // ✨ Mensagens revogadas
-                                'message.edited',            // ✨ Mensagens editadas
-                                'group.v2.join',             // ✨ Entrou em grupo
-                                'group.v2.leave',            // ✨ Saiu do grupo
-                                'group.v2.update',           // ✨ Grupo atualizado
-                                'group.v2.participants',     // ✨ Participantes alterados
-                                'presence.update',           // ✨ Presença atualizada
-                                'poll.vote',                 // ✨ Votos em enquetes
-                                'poll.vote.failed',          // ✨ Falha no voto
-                                'chat.archive',              // ✨ Chat arquivado
-                                'call.received',             // ✨ Chamada recebida
-                                'call.accepted',             // ✨ Chamada aceita
-                                'call.rejected',             // ✨ Chamada rejeitada
-                                'label.upsert',              // ✨ Label criada/atualizada
-                                'label.deleted',             // ✨ Label deletada
-                                'label.chat.added',          // ✨ Label adicionada ao chat
-                                'label.chat.deleted',        // ✨ Label removida do chat
-                                'event.response',            // ✨ Resposta do evento
-                                'event.response.failed',     // ✨ Falha na resposta
-                                'engine.event'               // ✨ Evento interno
-                            ]
-                        ]
+                $wahaWebhooks = [];
+                
+                // Webhook padrão do backend (sempre adicionado)
+                $wahaWebhooks[] = [
+                    'url' => "{$backendUrl}/webhook/waha/{$instanceId}",
+                    'events' => [
+                        'session.status',            // ✨ Status da sessão
+                        'message',                   // ✨ Mensagens recebidas
+                        'message.reaction',          // ✨ Reações
+                        'message.any',               // ✨ Todas as mensagens
+                        'message.ack',               // ✨ Mensagens lidas/entregues
+                        'message.revoked',           // ✨ Mensagens revogadas
+                        'message.edited',            // ✨ Mensagens editadas
+                        'group.v2.join',             // ✨ Entrou em grupo
+                        'group.v2.leave',            // ✨ Saiu do grupo
+                        'group.v2.update',           // ✨ Grupo atualizado
+                        'group.v2.participants',     // ✨ Participantes alterados
+                        'presence.update',           // ✨ Presença atualizada
+                        'poll.vote',                 // ✨ Votos em enquetes
+                        'poll.vote.failed',          // ✨ Falha no voto
+                        'chat.archive',              // ✨ Chat arquivado
+                        'call.received',             // ✨ Chamada recebida
+                        'call.accepted',             // ✨ Chamada aceita
+                        'call.rejected',             // ✨ Chamada rejeitada
+                        'label.upsert',              // ✨ Label criada/atualizada
+                        'label.deleted',             // ✨ Label deletada
+                        'label.chat.added',          // ✨ Label adicionada ao chat
+                        'label.chat.deleted',        // ✨ Label removida do chat
+                        'event.response',            // ✨ Resposta do evento
+                        'event.response.failed',     // ✨ Falha na resposta
+                        'engine.event'               // ✨ Evento interno
                     ]
+                ];
+                
+                // Adicionar webhooks customizados se fornecidos
+                foreach ($webhooks as $webhook) {
+                    if (!empty($webhook['url']) && !empty($webhook['events'])) {
+                        $wahaWebhooks[] = [
+                            'url' => $webhook['url'],
+                            'events' => $webhook['events'],
+                            'hmac' => $webhook['hmac'] ?? null,
+                            'retries' => $webhook['retries'] ?? null,
+                            'customHeaders' => $webhook['customHeaders'] ?? null
+                        ];
+                    }
+                }
+                
+                $payload['config'] = [
+                    'webhooks' => $wahaWebhooks
                 ];
             }
 
@@ -373,11 +389,7 @@ class WahaProvider implements ProviderInterface
     {
         try {
             // Solicitar código de autenticação
-            $response = $this->client->post("/api/{$externalInstanceId}/auth/request-code", [
-                'json' => [
-                    'phone' => $phoneNumber
-                ]
-            ]);
+            $response = $this->client->get("/api/{$externalInstanceId}/auth/qr");
             
             $data = json_decode($response->getBody()->getContents(), true);
             

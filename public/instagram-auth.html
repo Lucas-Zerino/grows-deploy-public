@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conectar Instagram - GrowHub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group small {
+            color: #666;
+            font-size: 14px;
+            margin-top: 4px;
+            display: block;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #666;
+            border: 2px solid #e1e5e9;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .status {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .auth-url {
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .help-text {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .help-text h4 {
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .help-text ul {
+            margin-left: 20px;
+            color: #666;
+        }
+
+        .help-text li {
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📸 GrowHub</div>
+        <div class="subtitle">Conectar Instagram Business</div>
+
+        <div id="status" class="status hidden"></div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Processando...</p>
+        </div>
+
+        <div id="configForm">
+            <div class="help-text">
+                <h4>Como configurar:</h4>
+                <ul>
+                    <li>1. Crie um Instagram App no <a href="https://developers.facebook.com/" target="_blank">Meta Developer</a></li>
+                    <li>2. Configure as permissões necessárias</li>
+                    <li>3. Adicione a URL de callback: <code id="callbackUrl"></code></li>
+                    <li>4. Insira suas credenciais abaixo (opcional)</li>
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label for="appId">App ID (opcional)</label>
+                <input type="text" id="appId" placeholder="Ex: 1234567890123456">
+                <small>Se não informado, será usado o App configurado na empresa</small>
+            </div>
+
+            <div class="form-group">
+                <label for="appSecret">App Secret (opcional)</label>
+                <input type="password" id="appSecret" placeholder="Ex: abc123def456...">
+                <small>Se não informado, será usado o App configurado na empresa</small>
+            </div>
+
+            <button class="btn" onclick="connectInstagram()">Conectar Instagram</button>
+            <button class="btn btn-secondary" onclick="checkStatus()">Verificar Status</button>
+        </div>
+
+        <div id="authResult" class="hidden">
+            <div class="auth-url" id="authUrl"></div>
+            <button class="btn" onclick="openAuthWindow()">Abrir Instagram</button>
+            <button class="btn btn-secondary" onclick="resetForm()">Voltar</button>
+        </div>
+    </div>
+
+    <script>
+        // Configurações
+        const API_BASE = window.location.origin;
+        const CALLBACK_URL = `${API_BASE}/api/instagram/callback`;
+        
+        // Elementos
+        const statusEl = document.getElementById('status');
+        const loadingEl = document.getElementById('loading');
+        const configFormEl = document.getElementById('configForm');
+        const authResultEl = document.getElementById('authResult');
+        const authUrlEl = document.getElementById('authUrl');
+        const callbackUrlEl = document.getElementById('callbackUrl');
+        const appIdEl = document.getElementById('appId');
+        const appSecretEl = document.getElementById('appSecret');
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            callbackUrlEl.textContent = CALLBACK_URL;
+            
+            // Verificar se há parâmetros na URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const companyToken = urlParams.get('company_token');
+            
+            if (companyToken) {
+                // Se tem token da empresa, tentar conectar automaticamente
+                connectInstagram();
+            }
+        });
+
+        // Mostrar status
+        function showStatus(message, type = 'info') {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+        }
+
+        // Mostrar loading
+        function showLoading(show = true) {
+            loadingEl.style.display = show ? 'block' : 'none';
+        }
+
+        // Conectar Instagram
+        async function connectInstagram() {
+            try {
+                showLoading(true);
+                hideStatus();
+
+                const appId = appIdEl.value.trim();
+                const appSecret = appSecretEl.value.trim();
+
+                // Se tem credenciais, configurar app primeiro
+                if (appId && appSecret) {
+                    await configureInstagramApp(appId, appSecret);
+                }
+
+                // Obter URL de autenticação
+                const response = await fetch(`${API_BASE}/api/instagram/auth-url`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${getCompanyToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    authUrlEl.textContent = data.data.auth_url;
+                    configFormEl.classList.add('hidden');
+                    authResultEl.classList.remove('hidden');
+                    showStatus('URL de autenticação gerada com sucesso!', 'success');
+                } else {
+                    showStatus(`Erro: ${data.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Erro ao conectar Instagram:', error);
+                showStatus(`Erro: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Configurar Instagram App
+        async function configureInstagramApp(appId, appSecret) {
+            const response = await fetch(`${API_BASE}/api/instagram/app`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getCompanyToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    app_id: appId,
+                    app_secret: appSecret
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Erro ao configurar Instagram App');
+            }
+
+            return data;
+        }
+
+        // Abrir janela de autenticação
+        function openAuthWindow() {
+            const authUrl = authUrlEl.textContent;
+            if (!authUrl) {
+                showStatus('URL de autenticação não encontrada', 'error');
+                return;
+            }
+
+            // Abrir popup
+            const popup = window.open(
+                authUrl,
+                'instagram-auth',
+                'width=600,height=700,scrollbars=yes,resizable=yes'
+            );
+
+            // Verificar se popup foi bloqueado
+            if (!popup) {
+                showStatus('Popup bloqueado. Permita popups para este site.', 'error');
+                return;
+            }
+
+            // Monitorar fechamento do popup
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosed);
+                    checkStatus();
+                }
+            }, 1000);
+
+            showStatus('Janela de autenticação aberta. Aguarde a autorização...', 'info');
+        }
+
+        // Verificar status da autenticação
+        async function checkStatus() {
+            try {
+                showLoading(true);
+                hideStatus();
+
+                const response = await fetch(`${API_BASE}/api/instagram/auth-status`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${getCompanyToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.data.authenticated) {
+                        showStatus(`Instagram conectado! Usuário: @${data.data.username}`, 'success');
+                        // Notificar parent window se estiver em iframe
+                        if (window.parent !== window) {
+                            window.parent.postMessage({
+                                type: 'instagram_auth_success',
+                                data: data.data
+                            }, '*');
+                        }
+                    } else {
+                        showStatus(`Instagram não conectado: ${data.data.message}`, 'error');
+                    }
+                } else {
+                    showStatus(`Erro: ${data.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+                showStatus(`Erro: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Resetar formulário
+        function resetForm() {
+            configFormEl.classList.remove('hidden');
+            authResultEl.classList.add('hidden');
+            hideStatus();
+            appIdEl.value = '';
+            appSecretEl.value = '';
+        }
+
+        // Esconder status
+        function hideStatus() {
+            statusEl.classList.add('hidden');
+        }
+
+        // Obter token da empresa
+        function getCompanyToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('company_token') || 'dev-company-token';
+        }
+
+        // Escutar mensagens do popup
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'instagram_auth_result') {
+                if (event.data.success) {
+                    showStatus('Instagram conectado com sucesso!', 'success');
+                    checkStatus();
+                } else {
+                    showStatus(`Erro na conexão: ${event.data.message}`, 'error');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

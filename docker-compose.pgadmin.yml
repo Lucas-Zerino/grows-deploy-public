@@ -1,0 +1,55 @@
+# Docker Compose para pgAdmin - Interface Web do PostgreSQL
+# Use este arquivo para adicionar pgAdmin ao seu ambiente existente
+
+services:
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: growhub_pgadmin
+    environment:
+      # Configurações do pgAdmin
+      PGADMIN_DEFAULT_EMAIL: admin@growhub.com
+      PGADMIN_DEFAULT_PASSWORD: Admin@123456
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      
+      # Configurações de segurança
+      PGADMIN_CONFIG_WTF_CSRF_ENABLED: 'False'
+      PGADMIN_CONFIG_SESSION_COOKIE_SECURE: 'False'
+      PGADMIN_CONFIG_SESSION_COOKIE_HTTPONLY: 'True'
+      PGADMIN_CONFIG_SESSION_COOKIE_SAMESITE: 'Lax'
+      
+      # Configurações de interface
+      PGADMIN_CONFIG_APP_NAME: 'GrowHub Database'
+      PGADMIN_CONFIG_CONSOLE_LOG_LEVEL: 'INFO'
+      
+    ports:
+      - "8080:80"  # Acesso web do pgAdmin
+      
+    volumes:
+      # Dados persistentes do pgAdmin
+      - pgadmin_data:/var/lib/pgadmin
+      
+      # Configurações personalizadas (opcional)
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      
+    networks:
+      - growhub_network
+      
+    # Remove dependência específica - pgAdmin se conecta via rede
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Reutiliza a rede existente do GrowHub
+networks:
+  growhub_network:
+    external: true
+
+# Volume para dados persistentes do pgAdmin
+volumes:
+  pgadmin_data:

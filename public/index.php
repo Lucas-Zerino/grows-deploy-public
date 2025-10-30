@@ -104,6 +104,43 @@ $router->post('/webhook/uazapi/{id}', function ($id) {
     WebhookController::uazapiWebhook($id);
 });
 
+// Instagram Webhooks
+$router->post('/webhook/instagram/{companyId}', function($companyId) {
+    \App\Controllers\InstagramWebhookController::handleWebhook($companyId);
+});
+$router->get('/webhook/instagram/{companyId}', function($companyId) {
+    \App\Controllers\InstagramWebhookController::verifyWebhook($companyId);
+});
+
+// Facebook Webhooks
+$router->post('/webhook/facebook/{companyId}', function($companyId) {
+    \App\Controllers\FacebookWebhookController::handleWebhook($companyId);
+});
+$router->get('/webhook/facebook/{companyId}', function($companyId) {
+    \App\Controllers\FacebookWebhookController::verifyWebhook($companyId);
+});
+
+// ===== INSTAGRAM ROUTES =====
+
+// Instagram App Management
+$router->post('/api/instagram/app', [\App\Controllers\InstagramAppController::class, 'create']);
+$router->get('/api/instagram/app', [\App\Controllers\InstagramAppController::class, 'get']);
+$router->put('/api/instagram/app', [\App\Controllers\InstagramAppController::class, 'update']);
+$router->delete('/api/instagram/app', [\App\Controllers\InstagramAppController::class, 'delete']);
+$router->get('/api/instagram/auth-url', [\App\Controllers\InstagramAppController::class, 'getAuthUrl']);
+
+// Instagram OAuth Callback
+$router->get('/api/instagram/callback', [\App\Controllers\InstagramAuthController::class, 'callback']);
+$router->get('/api/instagram/auth-status', [\App\Controllers\InstagramAuthController::class, 'getStatus']);
+
+// ===== FACEBOOK ROUTES =====
+
+// Facebook App Management
+$router->post('/api/facebook/app', [\App\Controllers\FacebookAppController::class, 'create']);
+$router->get('/api/facebook/app', [\App\Controllers\FacebookAppController::class, 'get']);
+$router->put('/api/facebook/app', [\App\Controllers\FacebookAppController::class, 'update']);
+$router->delete('/api/facebook/app', [\App\Controllers\FacebookAppController::class, 'delete']);
+
 // ===== COMPANY ROUTES (Autenticação requerida) =====
 
 // ===== INSTANCE ROUTES (Unificadas) =====
@@ -113,6 +150,25 @@ $router->post('/webhook/uazapi/{id}', function ($id) {
 if (!class_exists('App\\Controllers\\InstanceController')) {
     die('InstanceController class not found');
 }
+
+// ===== INSTANCE WEBHOOK ROUTES =====
+// Rotas para gerenciar webhooks de instâncias
+
+$router->get('/api/instances/{id}/webhooks', function($id) {
+    \App\Controllers\InstanceWebhookController::list($id);
+});
+
+$router->post('/api/instances/{id}/webhooks', function($id) {
+    \App\Controllers\InstanceWebhookController::create($id);
+});
+
+$router->put('/api/instances/{instanceId}/webhooks/{webhookId}', function($instanceId, $webhookId) {
+    \App\Controllers\InstanceWebhookController::update($instanceId, $webhookId);
+});
+
+$router->delete('/api/instances/{instanceId}/webhooks/{webhookId}', function($instanceId, $webhookId) {
+    \App\Controllers\InstanceWebhookController::delete($instanceId, $webhookId);
+});
 
 $router->post('/instance/connect', function() {
     $controller = new \App\Controllers\InstanceController();

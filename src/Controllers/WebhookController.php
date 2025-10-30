@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\Instance;
+use App\Models\InstanceWebhook;
 use App\Services\QueueService;
 use App\Utils\Logger;
 use App\Utils\Response;
@@ -19,20 +20,49 @@ class WebhookController
         try {
             $payload = Router::getJsonInput();
             
+            // Extrair ID numérico do external_instance_id (formato: company_id-instance_name)
+            $numericInstanceId = self::extractNumericInstanceId($instanceId);
+            
             Logger::info('WAHA webhook received', [
-                'instance_id' => $instanceId,
+                'external_instance_id' => $instanceId,
+                'numeric_instance_id' => $numericInstanceId,
                 'event_type' => $payload['event'] ?? 'unknown',
+                'payload' => $payload,
+                'context' => 'webhook_inbound'
             ]);
+            
+            if (!$numericInstanceId) {
+                Logger::warning('Invalid instance ID format in webhook', [
+                    'external_instance_id' => $instanceId,
+                    'context' => 'webhook_inbound'
+                ]);
+                
+                Response::error('Invalid instance ID format', 400);
+                return;
+            }
 
-            // Buscar instância
-            $instance = Instance::findById((int) $instanceId);
+            // Buscar instância pelo ID numérico
+            $instance = Instance::getById($numericInstanceId);
             
             if (!$instance) {
                 Logger::warning('Webhook received for non-existent instance', [
-                    'instance_id' => $instanceId,
+                    'external_instance_id' => $instanceId,
+                    'numeric_instance_id' => $numericInstanceId,
                 ]);
 
                 Response::notFound('Instance not found');
+                return;
+            }
+
+            // Se instância não estiver conectada, só processar eventos de estado
+            $incomingEventType = $payload['event'] ?? 'unknown';
+            if (($instance['status'] ?? '') !== 'connected' && !in_array($incomingEventType, ['state.change', 'session.status'])) {
+                Logger::info('Skipping webhook forwarding for disconnected instance', [
+                    'instance_id' => $instance['id'],
+                    'status' => $instance['status'],
+                    'event_type' => $incomingEventType
+                ]);
+                Response::success(['received' => true, 'skipped' => true]);
                 return;
             }
 
@@ -56,13 +86,15 @@ class WebhookController
                 'company_id' => $instance['company_id'],
                 'routing_key' => $routingKey,
                 'event_type' => $payload['event'] ?? 'unknown',
+                'translated_event' => $translatedEvent,
+                'context' => 'webhook_processed'
             ]);
 
             Response::success(['received' => true]);
 
         } catch (\Exception $e) {
             Logger::error('Failed to process WAHA webhook', [
-                'instance_id' => $instanceId,
+                'external_instance_id' => $instanceId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -83,10 +115,12 @@ class WebhookController
             Logger::info('UAZAPI webhook received', [
                 'instance_id' => $instanceId,
                 'event_type' => $payload['event'] ?? 'unknown',
+                'payload' => $payload,
+                'context' => 'webhook_inbound'
             ]);
 
             // Buscar instância
-            $instance = Instance::findById((int) $instanceId);
+            $instance = Instance::getById((int) $instanceId);
             
             if (!$instance) {
                 Logger::warning('Webhook received for non-existent instance', [
@@ -110,6 +144,8 @@ class WebhookController
                 'instance_id' => $instanceId,
                 'company_id' => $instance['company_id'],
                 'routing_key' => $routingKey,
+                'payload' => $payload,
+                'context' => 'webhook_processed'
             ]);
 
             Response::success(['received' => true]);
@@ -263,14 +299,20 @@ class WebhookController
             return self::translateStateChange($payload, $instance);
         }
         
+        // Normalizar session dentro do payload (remover prefixo da empresa ex: 11-1515 -> 1515)
+        $payloadNormalized = $payload;
+        if (isset($payloadNormalized['session']) && is_string($payloadNormalized['session'])) {
+            $payloadNormalized['session'] = self::extractInstanceName($payloadNormalized['session']);
+        }
+
         // Para outros eventos, formato customizado básico
         return [
             'event' => self::mapEventType($eventType),
             'session' => (int) $instance['id'],
             'container' => "api-{$instance['id']}",
             'device' => self::extractPhoneNumber($instance['phone_number'] ?? ''),
-            'data' => $payload,
-            'instance_id' => $instance['external_instance_id'],
+            'data' => $payloadNormalized,
+            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? null,
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',
@@ -333,7 +375,7 @@ class WebhookController
             'token' => $instance['token'] ?? '',
             
             // IMPORTANTE: Campos usados pelo worker para roteamento
-            'instance_id' => $instance['external_instance_id'], // Para o worker buscar webhook_url
+            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''), // normalizado para cliente
             'webhook_url' => $instance['webhook_url'] ?? null, // URL do webhook do cliente
         ];
         
@@ -371,7 +413,7 @@ class WebhookController
             'status' => $ackType,
             'ack' => (int)$ackStatus,
             'timestamp' => ($payload['timestamp'] ?? time()) * 1000,
-            'instance_id' => $instance['external_instance_id'],
+            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? '',
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',
@@ -409,11 +451,45 @@ class WebhookController
             'phone_number' => $instance['phone_number'] ?? '',
             'instance_name' => $instance['instance_name'],
             'timestamp' => time() * 1000,
-            'instance_id' => $instance['external_instance_id'],
+            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? '',
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',
         ];
+    }
+    
+    /**
+     * Extrai ID numérico do external_instance_id
+     * Formato: company_id-instance_name (ex: "11-1414" → 11)
+     */
+    private static function extractNumericInstanceId(string $externalInstanceId): ?int
+    {
+        // Se já for um número, retornar diretamente
+        if (is_numeric($externalInstanceId)) {
+            return (int) $externalInstanceId;
+        }
+        
+        // Extrair parte antes do primeiro hífen (company_id)
+        $parts = explode('-', $externalInstanceId, 2);
+        
+        if (count($parts) >= 1 && is_numeric($parts[0])) {
+            return (int) $parts[0];
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extrai o nome da instância (parte após o primeiro hífen)
+     * Ex: "11-1515" -> "1515". Se não houver hífen, retorna o original.
+     */
+    private static function extractInstanceName(string $externalInstanceId): string
+    {
+        $parts = explode('-', $externalInstanceId, 2);
+        if (count($parts) === 2) {
+            return $parts[1];
+        }
+        return $externalInstanceId;
     }
     
     /**

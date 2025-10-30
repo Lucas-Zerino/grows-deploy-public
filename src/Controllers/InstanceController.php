@@ -34,6 +34,17 @@ class InstanceController
                 return Response::error('ID do provider é obrigatório', 400);
             }
             
+            // Buscar provider para verificar tipo
+            $provider = \App\Models\Provider::findById($data['provider_id']);
+            if (!$provider) {
+                return Response::error('Provider não encontrado', 400);
+            }
+            
+            // Para Instagram, phone_number não é obrigatório
+            if ($provider['type'] !== 'instagram' && empty($data['phone_number'])) {
+                return Response::error('Número de telefone é obrigatório para este tipo de provider', 400);
+            }
+            
             // Extrair token do header Authorization
             $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
             $token = str_replace('Bearer ', '', $authHeader);
@@ -50,7 +61,7 @@ class InstanceController
                 'provider_id' => $data['provider_id'],
                 'instance_name' => $data['instance_name'],
                 'phone_number' => $data['phone_number'] ?? null,
-                'webhook_url' => $data['webhook_url'] ?? null
+                'webhook_url' => $data['webhook_url'] ?? null // Manter para compatibilidade
             ]);
             
             if (!$instanceId) {
@@ -62,6 +73,50 @@ class InstanceController
             
             if (!$instance) {
                 return Response::error('Erro ao buscar dados da instância criada', 500);
+            }
+            
+            // Processar múltiplos webhooks se fornecidos
+            $customWebhooks = [];
+            if (!empty($data['webhooks']) && is_array($data['webhooks'])) {
+                foreach ($data['webhooks'] as $webhookData) {
+                    if (!empty($webhookData['url'])) {
+                        // Salvar webhook no banco (se não especificar eventos, usa todos por padrão)
+                        $webhookId = \App\Models\InstanceWebhook::create([
+                            'instance_id' => $instanceId,
+                            'webhook_url' => $webhookData['url'],
+                            'events' => $webhookData['events'] ?? null, // null = usar padrão
+                            'is_active' => $webhookData['is_active'] ?? true
+                        ]);
+                        
+                        if ($webhookId) {
+                            $customWebhooks[] = [
+                                'url' => $webhookData['url'],
+                                'events' => $webhookData['events'],
+                                'hmac' => $webhookData['hmac'] ?? null,
+                                'retries' => $webhookData['retries'] ?? null,
+                                'customHeaders' => $webhookData['customHeaders'] ?? null
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // Se passou webhook_url mas não especificou array webhooks, criar webhook na tabela instance_webhooks
+            if (empty($customWebhooks) && !empty($data['webhook_url'])) {
+                $webhookId = \App\Models\InstanceWebhook::create([
+                    'instance_id' => $instanceId,
+                    'webhook_url' => $data['webhook_url'],
+                    'events' => null, // null = usar todos os eventos por padrão
+                    'is_active' => true
+                ]);
+                
+                if ($webhookId) {
+                    Logger::info('Webhook created for instance', [
+                        'instance_id' => $instanceId,
+                        'webhook_id' => $webhookId,
+                        'webhook_url' => $data['webhook_url']
+                    ]);
+                }
             }
             
             // Criar instância no provider
@@ -85,7 +140,7 @@ class InstanceController
                         'provider_type' => $provider['type']
                     ]);
                     
-                    $providerResult = $providerInstance->createInstance($formattedInstanceName, $data['phone_number'] ?? null);
+                    $providerResult = $providerInstance->createInstance($formattedInstanceName, $instanceId, $customWebhooks);
                     
                     Logger::info('Provider createInstance result', [
                         'instance_id' => $instanceId,
@@ -132,10 +187,47 @@ class InstanceController
                 'instance_name' => $data['instance_name']
             ]);
             
+            // Para Instagram, adicionar auth_url na resposta
+            $responseData = $instance;
+            if ($provider['type'] === 'instagram') {
+                try {
+                    $instagramApp = \App\Models\InstagramApp::getByCompanyId($company['id']);
+                    if ($instagramApp) {
+                        $redirectUri = $_ENV['INSTAGRAM_REDIRECT_URI'] ?? 'https://gapi.sockets.com.br/api/instagram/callback';
+                        $scopes = [
+                            'instagram_business_basic',
+                            'instagram_business_manage_messages',
+                            'instagram_business_manage_comments',
+                            'instagram_business_content_publish'
+                        ];
+                        
+                        $authUrl = "https://www.instagram.com/oauth/authorize?" . http_build_query([
+                            'client_id' => $instagramApp['app_id'],
+                            'redirect_uri' => $redirectUri,
+                            'response_type' => 'code',
+                            'scope' => implode(',', $scopes),
+                            'state' => base64_encode(json_encode([
+                                'company_id' => $company['id'],
+                                'app_id' => $instagramApp['id'],
+                                'instance_id' => $instance['id']
+                            ]))
+                        ]);
+                        
+                        $responseData['auth_url'] = $authUrl;
+                        $responseData['requires_oauth'] = true;
+                    }
+                } catch (\Exception $e) {
+                    Logger::warning('Failed to generate Instagram auth URL', [
+                        'error' => $e->getMessage(),
+                        'instance_id' => $instance['id']
+                    ]);
+                }
+            }
+            
             return Response::json([
                 'success' => true,
                 'message' => 'Instância criada com sucesso',
-                'data' => $instance
+                'data' => $responseData
             ], 201);
             
         } catch (\Exception $e) {
@@ -515,34 +607,53 @@ class InstanceController
                 return Response::notFound('Instância não encontrada');
             }
             
-            // Desconectar instância no provider se estiver conectada
-            if (in_array($instance['status'], ['connected', 'active', 'connecting'])) {
-                try {
-                    $provider = \App\Models\Provider::findById($instance['provider_id']);
-                    if ($provider) {
-                        $providerManager = new \App\Providers\ProviderManager();
-                        $providerInstance = $providerManager->getProvider($provider['id']);
+            // Desconectar e deletar instância no provider
+            try {
+                $provider = \App\Models\Provider::findById($instance['provider_id']);
+                if ($provider) {
+                    $providerManager = new \App\Providers\ProviderManager();
+                    $providerInstance = $providerManager->getProvider($provider['id']);
+                    
+                    if ($providerInstance) {
+                        $externalInstanceId = $instance['external_instance_id'] ?? self::formatInstanceName($instance);
                         
-                        if ($providerInstance) {
-                            // Desconectar no provider
-                            $disconnectResult = $providerInstance->disconnectInstance($instance['external_instance_id'] ?? self::formatInstanceName($instance));
+                        // Desconectar no provider se estiver conectada
+                        if (in_array($instance['status'], ['connected', 'active', 'connecting'])) {
+                            $disconnectResult = $providerInstance->disconnectInstance($externalInstanceId);
                             
                             if ($disconnectResult) {
                                 Logger::info('Instance disconnected from provider before deletion', [
                                     'instance_id' => $id,
                                     'provider_type' => $provider['type'],
-                                    'external_instance_id' => $instance['external_instance_id']
+                                    'external_instance_id' => $externalInstanceId
                                 ]);
                             }
                         }
+                        
+                        // Deletar no provider (sempre tentar deletar, mesmo se não estiver conectada)
+                        $deleteResult = $providerInstance->deleteInstance($externalInstanceId);
+                        
+                        if ($deleteResult) {
+                            Logger::info('Instance deleted from provider', [
+                                'instance_id' => $id,
+                                'provider_type' => $provider['type'],
+                                'external_instance_id' => $externalInstanceId
+                            ]);
+                        } else {
+                            Logger::warning('Failed to delete instance from provider', [
+                                'instance_id' => $id,
+                                'provider_type' => $provider['type'],
+                                'external_instance_id' => $externalInstanceId
+                            ]);
+                        }
                     }
-                } catch (\Exception $e) {
-                    Logger::warning('Failed to disconnect instance from provider before deletion', [
-                        'instance_id' => $id,
-                        'error' => $e->getMessage()
-                    ]);
-                    // Continuar com a deleção mesmo se a desconexão falhar
                 }
+            } catch (\Exception $e) {
+                Logger::warning('Failed to delete instance from provider', [
+                    'instance_id' => $id,
+                    'error' => $e->getMessage()
+                ]);
+                // Continuar com a deleção do banco mesmo se a deleção no provider falhar
             }
             
             // Deletar instância

@@ -46,6 +46,11 @@ echo "Criando providers padrão..."
 php /var/www/html/scripts/seed-providers.php
 echo "✓ Providers criados"
 
+# Executar migrações
+echo ""
+echo "Executando migrações..."
+php /var/www/html/scripts/run-migration.php || echo "⚠ Migração falhou ou já foi executada"
+
 # Criar dados de teste (empresa + provider)
 echo ""
 echo "Criando dados de teste..."

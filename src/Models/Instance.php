@@ -128,6 +128,33 @@ class Instance
     }
     
     /**
+     * Buscar instância pelo external_instance_id
+     */
+    public static function getByExternalInstanceId(string $externalInstanceId): ?array
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT i.*, c.name as company_name 
+                FROM instances i 
+                JOIN companies c ON i.company_id = c.id 
+                WHERE i.external_instance_id = ? AND i.status != 'deleted'
+            ");
+            $stmt->execute([$externalInstanceId]);
+            
+            $instance = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $instance ?: null;
+            
+        } catch (\Exception $e) {
+            Logger::error('Database error getting instance by external_instance_id', [
+                'error' => $e->getMessage(),
+                'external_instance_id' => $externalInstanceId
+            ]);
+            return null;
+        }
+    }
+    
+    /**
      * Atualizar status da instância
      */
     public static function updateStatus(int $id, string $status): bool
@@ -417,6 +444,95 @@ class Instance
                 'error' => $e->getMessage(),
                 'id' => $id,
                 'data' => $data
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Buscar instância por instagram_user_id
+     */
+    public static function getByInstagramUserId(string $instagramUserId): ?array
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT i.*, c.name as company_name 
+                FROM instances i 
+                JOIN companies c ON i.company_id = c.id 
+                WHERE i.instagram_user_id = ? AND i.status != 'deleted'
+            ");
+            $stmt->execute([$instagramUserId]);
+            
+            $instance = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $instance ?: null;
+            
+        } catch (\Exception $e) {
+            Logger::error('Database error getting instance by instagram_user_id', [
+                'error' => $e->getMessage(),
+                'instagram_user_id' => $instagramUserId
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Buscar instância por facebook_page_id
+     */
+    public static function getByFacebookPageId(string $facebookPageId): ?array
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT i.*, c.name as company_name 
+                FROM instances i 
+                JOIN companies c ON i.company_id = c.id 
+                WHERE i.facebook_page_id = ? AND i.status != 'deleted'
+            ");
+            $stmt->execute([$facebookPageId]);
+
+            $instance = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $instance ?: null;
+
+        } catch (\Exception $e) {
+            Logger::error('Database error getting instance by facebook_page_id', [
+                'error' => $e->getMessage(),
+                'facebook_page_id' => $facebookPageId
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Atualizar dados do Instagram na instância
+     */
+    public static function updateInstagramData(int $id, string $instagramUserId, string $instagramUsername): bool
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                UPDATE instances 
+                SET instagram_user_id = ?, instagram_username = ?, updated_at = NOW()
+                WHERE id = ?
+            ");
+            
+            $result = $stmt->execute([$instagramUserId, $instagramUsername, $id]);
+            
+            if ($result) {
+                Logger::info('Instance Instagram data updated', [
+                    'id' => $id,
+                    'instagram_user_id' => $instagramUserId,
+                    'instagram_username' => $instagramUsername
+                ]);
+            }
+            
+            return $result;
+            
+        } catch (\Exception $e) {
+            Logger::error('Database error updating Instagram data', [
+                'error' => $e->getMessage(),
+                'id' => $id,
+                'instagram_user_id' => $instagramUserId
             ]);
             return false;
         }

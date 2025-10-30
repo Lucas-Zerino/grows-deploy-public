@@ -190,10 +190,36 @@ services:
     command: sh /var/www/html/docker/scripts/setup.sh
     restart: "no"
 
+  # pgAdmin - Interface Web do PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: growhub_pgadmin_dev
+    environment:
+      # Configurações básicas do pgAdmin
+      PGADMIN_DEFAULT_EMAIL: admin@growhub.com
+      PGADMIN_DEFAULT_PASSWORD: Admin@123456
+      
+    ports:
+      - "8080:80"  # Acesso web do pgAdmin
+      
+    volumes:
+      # Dados persistentes do pgAdmin
+      - pgadmin_data_dev:/var/lib/pgadmin
+      
+    networks:
+      - growhub_network
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+        
+    restart: unless-stopped
+
 volumes:
   postgres_data_dev:
   rabbitmq_data_dev:
   vendor_data:  # Volume isolado para dependências PHP (evita problemas Windows)
+  pgadmin_data_dev:  # Volume para dados persistentes do pgAdmin
 
 networks:
   growhub_network:

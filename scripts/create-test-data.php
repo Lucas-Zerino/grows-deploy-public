@@ -15,24 +15,40 @@ $dotenv->load();
 echo "Creating test data...\n\n";
 
 try {
-    // Criar empresa de teste
-    echo "Creating test company...\n";
-    $companyId = Company::create(['name' => 'Empresa Teste']);
-    
-    if ($companyId) {
-        // Buscar dados da empresa criada
-        $company = Company::getById($companyId);
-        echo "✓ Company created: {$company['name']}\n";
-        echo "  Token: {$company['token']}\n";
-        echo "  ID: {$company['id']}\n\n";
-        
-        // Criar filas da empresa
-        echo "Creating company queues...\n";
-        QueueManagerService::createCompanyQueues($company['id']);
-    } else {
-        echo "❌ Failed to create company\n";
-        return;
+    // Verificar se já existe empresa de teste
+    $existingCompanies = Company::findAll();
+    $testCompany = null;
+    foreach ($existingCompanies as $company) {
+        if ($company['name'] === 'Empresa Teste') {
+            $testCompany = $company;
+            break;
+        }
     }
+    
+    if ($testCompany) {
+        echo "✓ Empresa de teste já existe: {$testCompany['name']}\n";
+        echo "  Token: {$testCompany['token']}\n";
+        echo "  ID: {$testCompany['id']}\n\n";
+        $company = $testCompany;
+    } else {
+        // Criar empresa de teste
+        echo "Creating test company...\n";
+        $companyId = Company::create(['name' => 'Empresa Teste']);
+        
+            // Buscar dados da empresa criada
+            $company = Company::getById($companyId);
+            echo "✓ Company created: {$company['name']}\n";
+            echo "  Token: {$company['token']}\n";
+            echo "  ID: {$company['id']}\n\n";
+        } else {
+            echo "❌ Failed to create company\n";
+            return;
+        }
+    }
+    
+    // Criar filas da empresa (se não existirem)
+    echo "Creating company queues...\n";
+    QueueManagerService::createCompanyQueues($company['id']);
     echo "✓ Queues created\n\n";
     
     // Verificar se existe provider WAHA ativo

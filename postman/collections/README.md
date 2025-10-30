@@ -9,12 +9,17 @@ postman/collections/
 ├── 01-auth.json                 # 🔐 Autenticação (Login, Perfil, Senha)
 ├── 02-companies.json            # 🏢 Empresas (CRUD)
 ├── 03-providers.json            # 🔌 Providers (WAHA, UAZAPI)
-├── 04-instances-api.json        # 📱 Instâncias - API Empresa (CRUD)
+├── 04-instances.json            # 📱 Instâncias - API Empresa (CRUD)
 ├── 05-instance-uazapi.json      # 📲 Instance UAZAPI (Conectar, Status, etc)
-├── 06-instances-superadmin.json # 🔧 Instâncias - Superadmin (Gerenciar)
-├── 07-messages.json             # 💬 Mensagens
-├── 08-events.json               # 📡 Eventos
-└── 09-health.json               # 💚 Health & Monitoring
+├── 06-instances-admin.json      # 🔧 Instâncias - Superadmin (Gerenciar)
+├── 07-send-messages.json        # 💬 Enviar Mensagens
+├── 08-message-actions.json      # 🔄 Ações na Mensagem e Buscar
+├── 09-contacts.json             # 👥 Contatos
+├── 10-groups.json               # 👥 Grupos
+├── 11-communities.json          # 🏘️ Comunidades
+├── 12-events.json               # 📡 Eventos
+├── 13-health.json               # 💚 Health & Monitoring
+└── 14-instance-webhooks.json    # 🔗 Webhooks de Instâncias (Múltiplos)
 ```
 
 ---
@@ -27,13 +32,14 @@ postman/collections/
 2. Clique em **Import**
 3. Selecione **a pasta** `postman/collections/`
 4. O Postman vai importar todos os arquivos automaticamente
-5. Você terá 9 pastas separadas! ✅
+5. Você terá 13 pastas separadas! ✅
 
 ### Opção 2: Importar Individual
 
 Importe apenas os arquivos que você precisa:
 - Trabalhando com auth? → `01-auth.json`
-- Testando instâncias? → `04-instances-api.json` + `05-instance-uazapi.json`
+- Testando instâncias? → `04-instances.json` + `05-instance-uazapi.json`
+- Gerenciando webhooks? → `14-instance-webhooks.json`
 
 ### Opção 3: Usar Arquivo Único (Legado)
 
@@ -83,7 +89,7 @@ Importe também: `postman/GrowHub-Gateway.postman_environment.json`
 3. Criar Provider (ou listar o padrão)
 ```
 
-### 4. **Criar Instância** (04-instances-api.json)
+### 4. **Criar Instância** (04-instances.json)
 ```
 4. Criar Instância → Salva instance_token ⭐
 ```
@@ -95,10 +101,18 @@ Importe também: `postman/GrowHub-Gateway.postman_environment.json`
 7. Atualizar Presença (usa instance_token)
 ```
 
-### 6. **Enviar Mensagens** (07-messages.json)
+### 6. **Gerenciar Webhooks** (14-instance-webhooks.json)
 ```
-8. Enviar Mensagem
-9. Listar Histórico
+8. Listar Webhooks da Instância
+9. Criar Webhook
+10. Atualizar Webhook
+11. Deletar Webhook
+```
+
+### 7. **Enviar Mensagens** (07-send-messages.json)
+```
+12. Enviar Mensagem
+13. Listar Histórico
 ```
 
 ---
@@ -146,7 +160,7 @@ POST /api/admin/companies
 Authorization: Bearer {superadmin_token}
 → company_token
 
-# 3. Criar Instância (04-instances-api.json)
+# 3. Criar Instância (04-instances.json)
 POST /api/instances
 Authorization: Bearer {company_token}
 → instance_token ⭐
@@ -242,5 +256,17 @@ Para mais detalhes sobre o sistema:
 - ✏️ Manutenção individual
 - 🎯 Importar apenas o necessário
 
-**Total de endpoints:** 30+ rotas organizadas em 9 categorias! 🚀
+**Total de endpoints:** 40+ rotas organizadas em 13 categorias! 🚀
+
+## 🔗 Nova Funcionalidade: Múltiplos Webhooks
+
+A coleção `14-instance-webhooks.json` inclui suporte completo para **múltiplos webhooks por instância**:
+
+- ✅ **Criar webhooks** com filtros por tipo de evento
+- ✅ **Atualizar webhooks** (URL, eventos, status)
+- ✅ **Gerenciar webhooks** via API REST
+- ✅ **Compatibilidade** com webhook legado
+- ✅ **Monitoramento** de tentativas de entrega
+
+Para mais detalhes, consulte: `README-WEBHOOKS.md`
 

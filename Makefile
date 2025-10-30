@@ -16,6 +16,7 @@ dev-up: ## Subir ambiente de desenvolvimento (Docker completo)
 	docker-compose -f docker-compose.dev.yml up -d --build
 	@echo "✓ Containers iniciados!"
 	@echo "API disponível em: http://localhost:8000"
+	@echo "pgAdmin disponível em: http://localhost:8080"
 
 dev-down: ## Parar ambiente de desenvolvimento
 	docker-compose -f docker-compose.dev.yml down
@@ -31,6 +32,9 @@ dev-logs-api: ## Ver logs da API (nginx + php-fpm)
 
 dev-logs-workers: ## Ver logs dos workers
 	docker-compose -f docker-compose.dev.yml logs -f worker-outbound worker-inbound worker-outbox worker-health
+
+dev-logs-pgadmin: ## Ver logs do pgAdmin
+	docker-compose -f docker-compose.dev.yml logs -f pgadmin
 
 dev-logs-webhooks: ## Ver logs de webhooks recebidos
 	@echo "Monitorando webhooks recebidos..."
@@ -129,4 +133,10 @@ restart-redis: ## 🔄 Reiniciar apenas Redis
 	@echo "Reiniciando Redis..."
 	docker-compose -f docker-compose.dev.yml restart redis
 	@echo "✓ Redis reiniciado!"
+
+# ========================================
+# PGADMIN - INTERFACE WEB DO POSTGRESQL
+# ========================================
+# pgAdmin agora está integrado no docker-compose.dev.yml
+# Use: make dev-up para iniciar tudo incluindo pgAdmin
 
