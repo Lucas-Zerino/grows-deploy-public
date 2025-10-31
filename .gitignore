@@ -10,6 +10,7 @@
 # Logs
 /logs/*.log
 /logs/*.json
+/public/logs/
 
 # IDE
 .idea/

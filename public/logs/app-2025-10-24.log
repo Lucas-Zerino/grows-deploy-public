@@ -1,2 +1,0 @@
-{"message":"Database connection established","context":{},"level":200,"level_name":"INFO","channel":"growhub","datetime":"2025-10-24T19:50:23.862805+00:00","extra":{}}
-{"message":"Admin logged in","context":{"admin_id":1,"email":"admin@growhub.com"},"level":200,"level_name":"INFO","channel":"growhub","datetime":"2025-10-24T19:50:23.915459+00:00","extra":{}}
