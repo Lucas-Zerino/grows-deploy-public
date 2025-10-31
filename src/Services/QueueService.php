@@ -69,10 +69,13 @@ class QueueService
             false     // auto_delete
         );
         
-        Logger::debug("Exchange declared", [
-            'exchange' => $exchangeName,
-            'type' => $type,
-        ]);
+        // Não logar aqui se for a exchange de logs (evitar loop infinito)
+        if ($exchangeName !== 'logs.exchange') {
+            Logger::debug("Exchange declared", [
+                'exchange' => $exchangeName,
+                'type' => $type,
+            ]);
+        }
     }
     
     /**
@@ -95,7 +98,10 @@ class QueueService
             $arguments
         );
         
-        Logger::debug("Queue declared", ['queue' => $queueName]);
+        // Não logar aqui se for a queue de logs (evitar loop infinito)
+        if ($queueName !== 'logs.queue') {
+            Logger::debug("Queue declared", ['queue' => $queueName]);
+        }
     }
     
     /**
@@ -110,11 +116,14 @@ class QueueService
         
         $channel->queue_bind($queueName, $exchangeName, $routingKey);
         
-        Logger::debug("Queue bound to exchange", [
-            'queue' => $queueName,
-            'exchange' => $exchangeName,
-            'routing_key' => $routingKey,
-        ]);
+        // Não logar aqui se for a queue de logs (evitar loop infinito)
+        if ($queueName !== 'logs.queue' && $exchangeName !== 'logs.exchange') {
+            Logger::debug("Queue bound to exchange", [
+                'queue' => $queueName,
+                'exchange' => $exchangeName,
+                'routing_key' => $routingKey,
+            ]);
+        }
     }
     
     public static function publish(
@@ -137,11 +146,14 @@ class QueueService
             
             $channel->basic_publish($message, $exchange, $routingKey);
             
-            Logger::debug('Message published to queue', [
-                'exchange' => $exchange,
-                'routing_key' => $routingKey,
-                'priority' => $priority,
-            ]);
+            // Não logar aqui se for a exchange de logs (evitar loop infinito)
+            if ($exchange !== 'logs.exchange') {
+                Logger::debug('Message published to queue', [
+                    'exchange' => $exchange,
+                    'routing_key' => $routingKey,
+                    'priority' => $priority,
+                ]);
+            }
             
             return true;
         } catch (\Exception $e) {
@@ -172,6 +184,7 @@ class QueueService
         callable $callback,
         int $prefetchCount = 5
     ): void {
+        // Passar queueName para o callback interno
         $channel = self::getChannel();
         $channel->basic_qos(null, $prefetchCount, null);
         

@@ -219,6 +219,14 @@ CREATE INDEX idx_logs_created ON logs(created_at DESC);
 CREATE INDEX idx_logs_company ON logs(company_id);
 CREATE INDEX idx_logs_payload ON logs USING GIN(payload);
 
+-- Índices compostos otimizados para queries comuns (úteis mesmo sem TimescaleDB)
+CREATE INDEX idx_logs_level_created ON logs(level, created_at DESC);
+CREATE INDEX idx_logs_company_created ON logs(company_id, created_at DESC) WHERE company_id IS NOT NULL;
+CREATE INDEX idx_logs_instance_created ON logs(instance_id, created_at DESC) WHERE instance_id IS NOT NULL;
+
+-- Comentário sobre otimização TimescaleDB (será aplicada via migration 007)
+-- COMMENT: A tabela logs será convertida em hypertable TimescaleDB para melhor performance via migration
+
 -- Rate limiting table
 CREATE TABLE rate_limits (
     id BIGSERIAL PRIMARY KEY,

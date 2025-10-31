@@ -14,6 +14,7 @@ return [
         'events' => 'events.exchange',
         'retry' => 'retry.exchange',
         'dlq' => 'dlq.exchange',
+        'logs' => 'logs.exchange', // Exchange para logs do sistema
     ],
     
     // Global queues
@@ -23,6 +24,7 @@ return [
         'queue_manager' => 'queue.manager',
         'webhook_fanout' => 'webhook.fanout',
         'dlq_final' => 'dlq.final',
+        'logs' => 'logs.queue', // Fila para processamento de logs
     ],
 ];
 

@@ -77,6 +77,39 @@ try {
             }
             
             return true; // Precisa executar
+        },
+        '007_add_timescaledb_logs.sql' => function($db) {
+            // Verificar se TimescaleDB já está instalado
+            try {
+                $stmt = $db->query("SELECT EXISTS (SELECT FROM pg_extension WHERE extname = 'timescaledb')");
+                $extensionExists = $stmt->fetchColumn();
+                
+                if ($extensionExists) {
+                    // Verificar se logs já é hypertable
+                    try {
+                        $stmt = $db->query("
+                            SELECT EXISTS (
+                                SELECT 1 FROM timescaledb_information.hypertables 
+                                WHERE hypertable_name = 'logs'
+                            )
+                        ");
+                        $isHypertable = $stmt->fetchColumn();
+                        
+                        if ($isHypertable) {
+                            echo "✓ TimescaleDB extension exists and logs is already a hypertable, skipping migration 007\n";
+                            return false;
+                        }
+                    } catch (\Exception $e) {
+                        // Se der erro, pode ser que a extensão não esteja totalmente instalada
+                        // Tentar executar a migration de qualquer forma
+                    }
+                }
+                
+                return true; // Precisa executar
+            } catch (\Exception $e) {
+                echo "⚠ Could not check TimescaleDB status, will attempt migration 007\n";
+                return true; // Tentar executar
+            }
         }
     ];
     

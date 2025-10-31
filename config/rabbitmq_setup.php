@@ -35,6 +35,9 @@ try {
     QueueService::declareExchange($config['exchanges']['dlq'], 'direct', true);
     echo "  ✓ {$config['exchanges']['dlq']} (direct)\n";
     
+    QueueService::declareExchange($config['exchanges']['logs'], 'topic', true);
+    echo "  ✓ {$config['exchanges']['logs']} (topic)\n";
+    
     // ===== DECLARAR FILAS GLOBAIS =====
     echo "\nCreating global queues...\n";
     
@@ -62,6 +65,12 @@ try {
         'final'
     );
     echo "  ✓ {$config['global_queues']['dlq_final']}\n";
+    
+    // Logs queue - consome todos os logs (logs.*)
+    $logsQueue = 'logs.queue';
+    QueueService::declareQueue($logsQueue, true);
+    QueueService::bindQueue($logsQueue, $config['exchanges']['logs'], 'logs.*');
+    echo "  ✓ {$logsQueue}\n";
     
     echo "\n✓ RabbitMQ topology setup completed successfully!\n";
     echo "\nNote: Company-specific queues will be created automatically when companies are created.\n";

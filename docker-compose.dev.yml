@@ -1,17 +1,19 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     container_name: growhub_postgres_dev
     environment:
       POSTGRES_DB: growhub_gateway
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=timescaledb"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./scripts/setup-timescaledb.sh:/docker-entrypoint-initdb.d/03-setup-timescaledb.sh
     networks:
       - growhub_network
     healthcheck:
@@ -156,6 +158,27 @@ services:
       - .:/var/www/html
       - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
       - ./logs:/var/www/html/logs
+    networks:
+      - growhub_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  worker-logs:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: growhub_worker_logs_dev
+    command: php /var/www/html/workers/log_processor_worker.php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - vendor_data:/var/www/html/vendor  # Volume isolado do Windows
     networks:
       - growhub_network
     depends_on:

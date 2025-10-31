@@ -6,6 +6,7 @@ use App\Services\HealthCheckService;
 use App\Middleware\RateLimitMiddleware;
 use App\Services\OutboxService;
 use App\Utils\Logger;
+use App\Utils\Database;
 use Dotenv\Dotenv;
 
 // Load environment variables
@@ -57,6 +58,15 @@ try {
             // Cleanup old rate limits
             $deletedRateLimits = RateLimitMiddleware::cleanup();
             echo "Cleaned {$deletedRateLimits} old rate limit records\n";
+            
+            // Cleanup old logs (configurável via LOG_RETENTION_DAYS, padrão 90 dias)
+            $retentionDays = (int)($_ENV['LOG_RETENTION_DAYS'] ?? 90);
+            $deletedLogs = cleanupOldLogs($retentionDays);
+            if ($deletedLogs >= 0) {
+                echo "Cleaned {$deletedLogs} old logs (older than {$retentionDays} days)\n";
+            } else {
+                echo "Cleaned old logs using TimescaleDB drop_chunks (older than {$retentionDays} days)\n";
+            }
         }
         
         $iteration++;
@@ -76,5 +86,54 @@ try {
     
     echo "Worker crashed: {$e->getMessage()}\n";
     exit(1);
+}
+
+/**
+ * Limpar logs antigos usando TimescaleDB drop_chunks ou DELETE simples
+ */
+function cleanupOldLogs(int $retentionDays): int
+{
+    try {
+        $db = Database::getInstance();
+        
+        // Verificar se TimescaleDB está instalado e se logs é hypertable
+        $isHypertable = $db->query("
+            SELECT EXISTS (
+                SELECT 1 FROM timescaledb_information.hypertables 
+                WHERE hypertable_name = 'logs'
+            )
+        ")->fetchColumn();
+        
+        if ($retentionDays <= 0) {
+            return 0; // Não limpar se retentionDays <= 0
+        }
+        
+        if ($isHypertable) {
+            // Usar drop_chunks do TimescaleDB (muito mais rápido)
+            $cutoffDate = date('Y-m-d H:i:s', strtotime("-{$retentionDays} days"));
+            
+            $sql = "SELECT drop_chunks('logs', INTERVAL '{$retentionDays} days')";
+            $db->exec($sql);
+            
+            // Retornar número estimado (não podemos contar exatamente com drop_chunks)
+            // Mas é muito mais eficiente que DELETE
+            return -1; // Indica que foi usado drop_chunks (muito mais eficiente)
+        } else {
+            // Fallback para DELETE se não for hypertable
+            $cutoffDate = date('Y-m-d H:i:s', strtotime("-{$retentionDays} days"));
+            
+            $sql = "DELETE FROM logs WHERE created_at < :cutoff_date";
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['cutoff_date' => $cutoffDate]);
+            
+            return $stmt->rowCount();
+        }
+    } catch (\Exception $e) {
+        Logger::warning('Failed to cleanup old logs', [
+            'error' => $e->getMessage(),
+            'retention_days' => $retentionDays,
+        ]);
+        return 0;
+    }
 }
 
