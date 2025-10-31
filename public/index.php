@@ -12,7 +12,6 @@ use App\Controllers\WebhookController;
 use App\Controllers\AdminController;
 use App\Controllers\SendController;
 use App\Controllers\MessageActionController;
-use App\Controllers\MenuController;
 use App\Controllers\ContactsController;
 use App\Controllers\GroupsController;
 use App\Controllers\CommunitiesController;
@@ -214,16 +213,22 @@ $router->put('/instance/presence', function() {
 // ===== SEND MESSAGE ROUTES (Unificadas) =====
 
 // Envio de mensagens unificadas (detecta provider automaticamente)
-$router->post('/send/text', [\App\Controllers\SendController::class, 'sendText']);
-$router->post('/send/media', [\App\Controllers\SendController::class, 'sendMedia']);
-$router->post('/send/contact', [\App\Controllers\SendController::class, 'sendContact']);
-$router->post('/send/location', [\App\Controllers\SendController::class, 'sendLocation']);
-
-// Menus interativos
-$router->post('/send/menu', [MenuController::class, 'sendMenu']);
-$router->post('/send/carousel', [MenuController::class, 'sendCarousel']);
-$router->post('/send/location-button', [MenuController::class, 'requestLocation']);
-$router->post('/send/status', [MenuController::class, 'sendStatus']);
+$router->post('/send/text', function() {
+    $controller = new \App\Controllers\SendController();
+    $controller->sendText();
+});
+$router->post('/send/media', function() {
+    $controller = new \App\Controllers\SendController();
+    $controller->sendMedia();
+});
+$router->post('/send/contact', function() {
+    $controller = new \App\Controllers\SendController();
+    $controller->sendContact();
+});
+$router->post('/send/location', function() {
+    $controller = new \App\Controllers\SendController();
+    $controller->sendLocation();
+});
 
 // Ações em mensagens
 $router->post('/message/presence', [MessageActionController::class, 'updatePresence']);

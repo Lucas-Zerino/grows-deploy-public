@@ -80,15 +80,32 @@ class InstanceController
             if (!empty($data['webhooks']) && is_array($data['webhooks'])) {
                 foreach ($data['webhooks'] as $webhookData) {
                     if (!empty($webhookData['url'])) {
-                        // Salvar webhook no banco (se não especificar eventos, usa todos por padrão)
-                        $webhookId = \App\Models\InstanceWebhook::create([
-                            'instance_id' => $instanceId,
-                            'webhook_url' => $webhookData['url'],
-                            'events' => $webhookData['events'] ?? null, // null = usar padrão
-                            'is_active' => $webhookData['is_active'] ?? true
-                        ]);
-                        
-                        if ($webhookId) {
+                        try {
+                            // Salvar webhook no banco (se não especificar eventos, usa todos por padrão)
+                            $webhookId = \App\Models\InstanceWebhook::create([
+                                'instance_id' => $instanceId,
+                                'webhook_url' => $webhookData['url'],
+                                'events' => $webhookData['events'] ?? null, // null = usar padrão
+                                'is_active' => $webhookData['is_active'] ?? true
+                            ]);
+                            
+                            // Adicionar ao array de customWebhooks mesmo se não salvar no banco (para enviar ao provider)
+                            $customWebhooks[] = [
+                                'url' => $webhookData['url'],
+                                'events' => $webhookData['events'],
+                                'hmac' => $webhookData['hmac'] ?? null,
+                                'retries' => $webhookData['retries'] ?? null,
+                                'customHeaders' => $webhookData['customHeaders'] ?? null
+                            ];
+                        } catch (\Exception $e) {
+                            // Se a tabela não existir, apenas logar mas continuar (webhook ainda será enviado ao provider)
+                            Logger::warning('Failed to save webhook to database (table may not exist)', [
+                                'instance_id' => $instanceId,
+                                'webhook_url' => $webhookData['url'],
+                                'error' => $e->getMessage()
+                            ]);
+                            
+                            // Mesmo assim, adicionar ao array para enviar ao provider
                             $customWebhooks[] = [
                                 'url' => $webhookData['url'],
                                 'events' => $webhookData['events'],
@@ -103,18 +120,27 @@ class InstanceController
             
             // Se passou webhook_url mas não especificou array webhooks, criar webhook na tabela instance_webhooks
             if (empty($customWebhooks) && !empty($data['webhook_url'])) {
-                $webhookId = \App\Models\InstanceWebhook::create([
-                    'instance_id' => $instanceId,
-                    'webhook_url' => $data['webhook_url'],
-                    'events' => null, // null = usar todos os eventos por padrão
-                    'is_active' => true
-                ]);
-                
-                if ($webhookId) {
-                    Logger::info('Webhook created for instance', [
+                try {
+                    $webhookId = \App\Models\InstanceWebhook::create([
                         'instance_id' => $instanceId,
-                        'webhook_id' => $webhookId,
-                        'webhook_url' => $data['webhook_url']
+                        'webhook_url' => $data['webhook_url'],
+                        'events' => null, // null = usar todos os eventos por padrão
+                        'is_active' => true
+                    ]);
+                    
+                    if ($webhookId) {
+                        Logger::info('Webhook created for instance', [
+                            'instance_id' => $instanceId,
+                            'webhook_id' => $webhookId,
+                            'webhook_url' => $data['webhook_url']
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Se a tabela não existir, apenas logar o erro mas não falhar a criação da instância
+                    Logger::warning('Failed to create instance webhook (table may not exist)', [
+                        'instance_id' => $instanceId,
+                        'webhook_url' => $data['webhook_url'],
+                        'error' => $e->getMessage()
                     ]);
                 }
             }
@@ -140,7 +166,8 @@ class InstanceController
                         'provider_type' => $provider['type']
                     ]);
                     
-                    $providerResult = $providerInstance->createInstance($formattedInstanceName, $instanceId, $customWebhooks);
+                    // Passar external_instance_id (formattedInstanceName) para o webhook URL em vez do ID numérico
+                    $providerResult = $providerInstance->createInstance($formattedInstanceName, $formattedInstanceName, $customWebhooks);
                     
                     Logger::info('Provider createInstance result', [
                         'instance_id' => $instanceId,
@@ -187,8 +214,22 @@ class InstanceController
                 'instance_name' => $data['instance_name']
             ]);
             
-            // Para Instagram, adicionar auth_url na resposta
+            // Preparar resposta com campos apropriados para o tipo de provider
             $responseData = $instance;
+            
+            // Remover campos do Instagram se não for provider Instagram
+            if ($provider['type'] !== 'instagram') {
+                unset($responseData['instagram_user_id']);
+                unset($responseData['instagram_username']);
+            }
+            
+            // Remover campos do Facebook se não for provider Facebook
+            if ($provider['type'] !== 'facebook') {
+                unset($responseData['facebook_page_id']);
+                unset($responseData['facebook_page_name']);
+            }
+            
+            // Para Instagram, adicionar auth_url na resposta
             if ($provider['type'] === 'instagram') {
                 try {
                     $instagramApp = \App\Models\InstagramApp::getByCompanyId($company['id']);

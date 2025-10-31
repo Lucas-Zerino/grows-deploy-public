@@ -112,6 +112,8 @@ services:
       - ./logs:/var/www/html/logs
     networks:
       - growhub_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Permite acessar serviços do host (Windows/Mac/Linux)
     depends_on:
       postgres:
         condition: service_healthy

@@ -144,8 +144,11 @@ class WahaInstanceProvider
     public function disconnect(string $externalInstanceId): array
     {
         try {
+            // Timeout reduzido para evitar espera longa
             $response = $this->client->post("/api/sessions/{$externalInstanceId}/stop", [
-                'json' => ['logout' => true]
+                'json' => ['logout' => true],
+                'connect_timeout' => 5,
+                'timeout' => 10
             ]);
             
             $data = json_decode($response->getBody()->getContents(), true);
@@ -278,13 +281,17 @@ class WahaInstanceProvider
     public function delete(string $externalInstanceId): array
     {
         try {
-            // Primeiro parar a sessão
-            $this->client->post("/api/sessions/{$externalInstanceId}/stop", [
-                'json' => ['logout' => true]
-            ]);
+            // Timeout reduzido para evitar espera longa se WAHA não estiver disponível
+            // connect_timeout: 5s (tempo para estabelecer conexão)
+            // timeout: 10s (tempo total da requisição)
+            //
+            // NOTA: DELETE /api/sessions/{session} já faz "Stop and logout as well"
+            // Operação idempotente - não precisa chamar stop antes
             
-            // Depois deletar
-            $response = $this->client->delete("/api/sessions/{$externalInstanceId}");
+            $response = $this->client->delete("/api/sessions/{$externalInstanceId}", [
+                'connect_timeout' => 5,
+                'timeout' => 10
+            ]);
             
             Logger::info('WAHA instance deleted', [
                 'external_id' => $externalInstanceId
@@ -296,14 +303,27 @@ class WahaInstanceProvider
             ];
             
         } catch (GuzzleException $e) {
-            Logger::error('WAHA delete instance failed', [
+            // Se não conseguir conectar ou timeout, retornar sucesso parcial
+            // A instância será deletada do banco mesmo assim
+            Logger::warning('WAHA delete failed (but will continue)', [
                 'external_id' => $externalInstanceId,
                 'error' => $e->getMessage(),
             ]);
             
             return [
-                'success' => false,
-                'message' => 'Erro ao deletar instância: ' . $e->getMessage()
+                'success' => true, // true para não bloquear deleção no banco
+                'message' => 'Tentativa de deletar no provider falhou, mas instância será removida do banco'
+            ];
+        } catch (\Exception $e) {
+            Logger::error('WAHA delete instance failed with unexpected error', [
+                'external_id' => $externalInstanceId,
+                'error' => $e->getMessage(),
+            ]);
+            
+            // Retornar sucesso para não bloquear deleção no banco
+            return [
+                'success' => true,
+                'message' => 'Erro ao deletar no provider, mas instância será removida do banco'
             ];
         }
     }

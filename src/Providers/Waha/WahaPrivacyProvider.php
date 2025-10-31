@@ -91,17 +91,31 @@ class WahaPrivacyProvider
     
     /**
      * Atualizar status de presença
-     * Padrão UAZAPI: PUT /instance/presence
+     * WAHA: POST /api/:session/presence
+     * Payload: {chatId, presence}
+     * Valores de presence: available, composing, recording, paused, offline
      */
-    public function updatePresence(string $externalInstanceId, string $status, ?string $message = null): array
+    public function updatePresence(string $externalInstanceId, string $status, ?string $message = null, ?string $chatId = null): array
     {
         try {
-            $payload = ['status' => $status];
-            if ($message) {
-                $payload['message'] = $message;
+            // WAHA requer chatId para atualizar presença
+            // Se não fornecido, retorna erro
+            if (!$chatId) {
+                return [
+                    'success' => false,
+                    'message' => 'chatId é obrigatório para atualizar presença na WAHA'
+                ];
             }
             
-            $response = $this->client->post("/api/sessions/{$externalInstanceId}/presence", [
+            $payload = [
+                'chatId' => $chatId,
+                'presence' => $status // available, composing, recording, paused, offline
+            ];
+            
+            // WAHA não usa campo "message" para presence, mas mantemos compatibilidade
+            // A mensagem pode ser usada no nosso próprio sistema se necessário
+            
+            $response = $this->client->post("/api/{$externalInstanceId}/presence", [
                 'json' => $payload
             ]);
             
@@ -110,6 +124,7 @@ class WahaPrivacyProvider
             Logger::info('WAHA presence updated', [
                 'external_id' => $externalInstanceId,
                 'status' => $status,
+                'chatId' => $chatId,
                 'message' => $message
             ]);
             
@@ -123,6 +138,7 @@ class WahaPrivacyProvider
             Logger::error('WAHA update presence failed', [
                 'external_id' => $externalInstanceId,
                 'status' => $status,
+                'chatId' => $chatId,
                 'message' => $message,
                 'error' => $e->getMessage(),
             ]);

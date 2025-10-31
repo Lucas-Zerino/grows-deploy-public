@@ -67,15 +67,70 @@ CREATE TABLE instances (
     webhook_url VARCHAR(500),
     external_instance_id VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    UNIQUE(company_id, instance_name)
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Unique constraint: permite recriar instância com mesmo nome após deletar
+-- A constraint só aplica para registros que NÃO estão deletados
+CREATE UNIQUE INDEX instances_company_id_instance_name_key ON instances(company_id, instance_name) WHERE status != 'deleted';
 
 CREATE INDEX idx_instances_company ON instances(company_id);
 CREATE INDEX idx_instances_provider ON instances(provider_id);
 CREATE INDEX idx_instances_status ON instances(status);
 CREATE INDEX idx_instances_token ON instances(token);
 CREATE INDEX idx_instances_phone ON instances(phone_number);
+
+-- Instance webhooks table (multiple webhooks per instance)
+CREATE TABLE instance_webhooks (
+    id SERIAL PRIMARY KEY,
+    instance_id INTEGER NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    webhook_url VARCHAR(500) NOT NULL,
+    events JSONB NOT NULL DEFAULT '[]',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_retry_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_instance_webhooks_instance ON instance_webhooks(instance_id);
+CREATE INDEX idx_instance_webhooks_active ON instance_webhooks(is_active);
+CREATE INDEX idx_instance_webhooks_url ON instance_webhooks(webhook_url);
+
+COMMENT ON TABLE instance_webhooks IS 'Multiple webhooks per instance for receiving events';
+COMMENT ON COLUMN instance_webhooks.events IS 'Array of event types this webhook should receive';
+COMMENT ON COLUMN instance_webhooks.retry_count IS 'Number of failed delivery attempts';
+COMMENT ON COLUMN instance_webhooks.last_retry_at IS 'Last time a retry was attempted';
+
+-- Validated phone numbers table (cache de números validados)
+CREATE TABLE IF NOT EXISTS validated_phone_numbers (
+    id SERIAL PRIMARY KEY,
+    instance_id INTEGER NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    original_number VARCHAR(20) NOT NULL,
+    validated_number VARCHAR(20) NOT NULL,
+    is_valid BOOLEAN NOT NULL DEFAULT true,
+    last_validated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX validated_phone_numbers_instance_original_key 
+    ON validated_phone_numbers(instance_id, original_number);
+
+CREATE INDEX idx_validated_phone_numbers_validated 
+    ON validated_phone_numbers(instance_id, validated_number);
+
+CREATE INDEX idx_validated_phone_numbers_original 
+    ON validated_phone_numbers(instance_id, original_number);
+
+COMMENT ON TABLE validated_phone_numbers IS 'Cache de números de telefone validados para evitar validações repetidas';
+COMMENT ON COLUMN validated_phone_numbers.original_number IS 'Número original fornecido pelo usuário';
+COMMENT ON COLUMN validated_phone_numbers.validated_number IS 'Número correto validado (com ou sem dígito 9)';
+COMMENT ON COLUMN validated_phone_numbers.is_valid IS 'Se o número é válido no WhatsApp';
+COMMENT ON COLUMN validated_phone_numbers.last_validated_at IS 'Última vez que o número foi validado';
+
+CREATE TRIGGER update_validated_phone_numbers_updated_at BEFORE UPDATE ON validated_phone_numbers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Messages table
 CREATE TABLE messages (
@@ -212,11 +267,15 @@ CREATE TRIGGER update_providers_updated_at BEFORE UPDATE ON providers
 CREATE TRIGGER update_instances_updated_at BEFORE UPDATE ON instances
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_instance_webhooks_updated_at BEFORE UPDATE ON instance_webhooks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Comments
 COMMENT ON TABLE admins IS 'Administradores do sistema (superadmin e staff)';
 COMMENT ON TABLE companies IS 'Empresas que utilizam o gateway';
 COMMENT ON TABLE providers IS 'Servidores WAHA/UAZAPI configurados';
 COMMENT ON TABLE instances IS 'Instâncias de WhatsApp das empresas';
+COMMENT ON TABLE instance_webhooks IS 'Múltiplos webhooks por instância para receber eventos';
 COMMENT ON TABLE messages IS 'Histórico de mensagens enviadas e recebidas';
 COMMENT ON TABLE events IS 'Eventos relacionados às mensagens e instâncias';
 COMMENT ON TABLE outbox_messages IS 'Outbox pattern para garantir entrega às filas';

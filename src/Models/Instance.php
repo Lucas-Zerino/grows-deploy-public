@@ -155,6 +155,33 @@ class Instance
     }
     
     /**
+     * Buscar instância pelo nome (instance_name)
+     */
+    public static function getByInstanceName(string $instanceName): ?array
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("
+                SELECT i.*, c.name as company_name 
+                FROM instances i 
+                JOIN companies c ON i.company_id = c.id 
+                WHERE i.instance_name = ? AND i.status != 'deleted'
+            ");
+            $stmt->execute([$instanceName]);
+            
+            $instance = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return $instance ?: null;
+            
+        } catch (\Exception $e) {
+            Logger::error('Database error getting instance by instance_name', [
+                'error' => $e->getMessage(),
+                'instance_name' => $instanceName
+            ]);
+            return null;
+        }
+    }
+    
+    /**
      * Atualizar status da instância
      */
     public static function updateStatus(int $id, string $status): bool

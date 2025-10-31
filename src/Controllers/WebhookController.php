@@ -20,43 +20,80 @@ class WebhookController
         try {
             $payload = Router::getJsonInput();
             
-            // Extrair ID numérico do external_instance_id (formato: company_id-instance_name)
-            $numericInstanceId = self::extractNumericInstanceId($instanceId);
-            
             Logger::info('WAHA webhook received', [
                 'external_instance_id' => $instanceId,
-                'numeric_instance_id' => $numericInstanceId,
                 'event_type' => $payload['event'] ?? 'unknown',
                 'payload' => $payload,
                 'context' => 'webhook_inbound'
             ]);
             
-            if (!$numericInstanceId) {
-                Logger::warning('Invalid instance ID format in webhook', [
-                    'external_instance_id' => $instanceId,
-                    'context' => 'webhook_inbound'
+            // Buscar instância diretamente pelo external_instance_id
+            // O external_instance_id vem no formato: company_id-instance_name (ex: "18-lucastest1")
+            $instance = Instance::getByExternalInstanceId($instanceId);
+            
+            // Se não encontrar, tentar buscar pelo session que vem no payload
+            // (a WAHA às vezes envia o ID numérico na URL mas o session correto no payload)
+            if (!$instance && isset($payload['session'])) {
+                $sessionFromPayload = $payload['session'];
+                Logger::info('Instance not found by URL parameter, trying session from payload', [
+                    'url_instance_id' => $instanceId,
+                    'payload_session' => $sessionFromPayload
                 ]);
+                $instance = Instance::getByExternalInstanceId($sessionFromPayload);
                 
-                Response::error('Invalid instance ID format', 400);
-                return;
+                if ($instance) {
+                    Logger::info('Instance found by payload session', [
+                        'url_instance_id' => $instanceId,
+                        'payload_session' => $sessionFromPayload,
+                        'found_instance_id' => $instance['id']
+                    ]);
+                }
             }
-
-            // Buscar instância pelo ID numérico
-            $instance = Instance::getById($numericInstanceId);
             
             if (!$instance) {
                 Logger::warning('Webhook received for non-existent instance', [
                     'external_instance_id' => $instanceId,
-                    'numeric_instance_id' => $numericInstanceId,
+                    'payload_session' => $payload['session'] ?? null,
+                    'payload' => $payload
                 ]);
 
                 Response::notFound('Instance not found');
                 return;
             }
 
-            // Se instância não estiver conectada, só processar eventos de estado
+            // Se instância não estiver conectada, só processar eventos de estado E eventos de mensagem (que indicam que está funcionando)
             $incomingEventType = $payload['event'] ?? 'unknown';
-            if (($instance['status'] ?? '') !== 'connected' && !in_array($incomingEventType, ['state.change', 'session.status'])) {
+            $allowedEventsWhenNotConnected = ['state.change', 'session.status', 'message', 'message.ack', 'engine.event'];
+            
+            // Filtrar eventos engine.event desnecessários (sincronização interna do WhatsApp)
+            // Esses eventos são gerados em massa durante sync e não são úteis para o cliente
+            $engineEventTypesToIgnore = [
+                'events.AppState',        // Mudanças de estado interno (contacts, archive, mute, etc)
+                'events.Contact',         // Sincronização de contatos
+                'events.DeleteForMe',     // Mensagens deletadas
+                'events.Pin',            // Chats fixados
+                'events.Mute',           // Chats silenciados
+                'events.Archive',        // Chats arquivados
+                'events.MarkChatAsRead', // Chats marcados como lidos
+                'events.Star',           // Mensagens favoritadas
+                'events.Call',            // Logs de chamadas
+            ];
+            
+            // Verificar se é um engine.event que deve ser ignorado
+            if ($incomingEventType === 'engine.event') {
+                $eventData = $payload['payload']['event'] ?? $payload['payload']['data']['event'] ?? null;
+                if ($eventData && in_array($eventData, $engineEventTypesToIgnore)) {
+                    Logger::debug('Ignoring unnecessary engine.event', [
+                        'instance_id' => $instance['id'],
+                        'event_type' => $eventData,
+                        'note' => 'Internal WhatsApp sync event, not useful for client'
+                    ]);
+                    Response::success(['received' => true, 'ignored' => true]);
+                    return;
+                }
+            }
+            
+            if (($instance['status'] ?? '') !== 'connected' && !in_array($incomingEventType, $allowedEventsWhenNotConnected)) {
                 Logger::info('Skipping webhook forwarding for disconnected instance', [
                     'instance_id' => $instance['id'],
                     'status' => $instance['status'],
@@ -64,6 +101,16 @@ class WebhookController
                 ]);
                 Response::success(['received' => true, 'skipped' => true]);
                 return;
+            }
+            
+            // Se receber evento de mensagem e status for "connecting", atualizar para "connected" (instância está funcionando)
+            if (($instance['status'] ?? '') === 'connecting' && in_array($incomingEventType, ['message', 'message.ack', 'engine.event'])) {
+                Logger::info('Instance is active, updating status to connected', [
+                    'instance_id' => $instance['id'],
+                    'event_type' => $incomingEventType
+                ]);
+                Instance::updateStatus($instance['id'], 'connected');
+                $instance['status'] = 'connected'; // Atualizar array local para usar no resto do código
             }
 
             // PRIMEIRO: Processar evento internamente (atualizar banco, etc)
@@ -173,7 +220,12 @@ class WebhookController
                 case 'state.change':
                 case 'session.status':
                     // Atualizar status da instância
-                    self::processStateChange($payload, $instance);
+                    // Para session.status, o status está em payload.payload.status
+                    // Para state.change, o status está em payload.state
+                    $eventPayload = ($eventType === 'session.status' && isset($payload['payload'])) 
+                        ? $payload['payload'] 
+                        : $payload;
+                    self::processStateChange($eventPayload, $instance);
                     break;
                     
                 case 'message.ack':
@@ -202,9 +254,19 @@ class WebhookController
      */
     private static function processStateChange(array $payload, array $instance): void
     {
+        // O payload já foi extraído corretamente antes de chamar este método
+        // Para session.status: payload['payload']
+        // Para state.change: payload completo
         $state = $payload['state'] ?? $payload['status'] ?? null;
         
-        if (!$state) return;
+        if (!$state) {
+            Logger::warning('No state found in payload', [
+                'instance_id' => $instance['id'],
+                'payload_keys' => array_keys($payload),
+                'payload_structure' => $payload
+            ]);
+            return;
+        }
         
         // Mapear estados da WAHA para nosso sistema
         $statusMap = [
@@ -218,6 +280,14 @@ class WebhookController
         ];
         
         $newStatus = $statusMap[$state] ?? null;
+        
+        Logger::info('Processing state change', [
+            'instance_id' => $instance['id'],
+            'current_status' => $instance['status'],
+            'waha_state' => $state,
+            'mapped_status' => $newStatus,
+            'will_update' => ($newStatus && $newStatus !== $instance['status']),
+        ]);
         
         if ($newStatus && $newStatus !== $instance['status']) {
             Instance::updateStatus($instance['id'], $newStatus);
@@ -296,7 +366,8 @@ class WebhookController
         
         // Se for mudança de estado (conexão/desconexão), usar formato de estado
         if (in_array($eventType, ['state.change', 'session.status'])) {
-            return self::translateStateChange($payload, $instance);
+            // Passar o evento completo para translateStateChange poder acessar payload['payload']['status']
+            return self::translateStateChange($wahaEvent, $instance);
         }
         
         // Normalizar session dentro do payload (remover prefixo da empresa ex: 11-1515 -> 1515)
@@ -312,7 +383,7 @@ class WebhookController
             'container' => "api-{$instance['id']}",
             'device' => self::extractPhoneNumber($instance['phone_number'] ?? ''),
             'data' => $payloadNormalized,
-            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
+            'instance_id' => $instance['external_instance_id'] ?? '', // Usar external_instance_id completo para o worker buscar corretamente
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? null,
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',
@@ -375,7 +446,7 @@ class WebhookController
             'token' => $instance['token'] ?? '',
             
             // IMPORTANTE: Campos usados pelo worker para roteamento
-            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''), // normalizado para cliente
+            'instance_id' => $instance['external_instance_id'] ?? '', // Usar external_instance_id completo para o worker buscar corretamente
             'webhook_url' => $instance['webhook_url'] ?? null, // URL do webhook do cliente
         ];
         
@@ -413,7 +484,7 @@ class WebhookController
             'status' => $ackType,
             'ack' => (int)$ackStatus,
             'timestamp' => ($payload['timestamp'] ?? time()) * 1000,
-            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
+            'instance_id' => $instance['external_instance_id'] ?? '', // Usar external_instance_id completo para o worker buscar corretamente
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? '',
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',
@@ -425,7 +496,10 @@ class WebhookController
      */
     private static function translateStateChange(array $payload, array $instance): array
     {
-        $state = $payload['state'] ?? $payload['status'] ?? 'unknown';
+        // Extrair estado do payload (pode estar em diferentes lugares dependendo do tipo de evento)
+        // Para session.status do webhook WAHA: payload['payload']['status']
+        // Para state.change: payload['state']
+        $state = $payload['payload']['status'] ?? $payload['payload']['state'] ?? $payload['state'] ?? $payload['status'] ?? 'unknown';
         
         // Mapear estados da WAHA
         $stateMap = [
@@ -451,7 +525,7 @@ class WebhookController
             'phone_number' => $instance['phone_number'] ?? '',
             'instance_name' => $instance['instance_name'],
             'timestamp' => time() * 1000,
-            'instance_id' => self::extractInstanceName($instance['external_instance_id'] ?? ''),
+            'instance_id' => $instance['external_instance_id'] ?? '', // Usar external_instance_id completo para o worker buscar corretamente
             'webhook_url' => $instance['webhook_url'] ?? null,
             'token' => $instance['token'] ?? '',
             'ambiente' => $_ENV['APP_ENV'] ?? 'dev',

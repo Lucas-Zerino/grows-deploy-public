@@ -418,4 +418,13 @@ class WahaProvider implements ProviderInterface
             ];
         }
     }
+    
+    /**
+     * Verificar se um número existe no WhatsApp
+     * Delega para WahaMessageProvider
+     */
+    public function checkNumberStatus(string $externalInstanceId, string $phone): array
+    {
+        return $this->messageProvider->checkNumberStatus($externalInstanceId, $phone);
+    }
 }

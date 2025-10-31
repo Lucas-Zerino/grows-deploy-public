@@ -51,10 +51,16 @@ echo ""
 echo "Executando migrações..."
 php /var/www/html/scripts/run-migration.php || echo "⚠ Migração falhou ou já foi executada"
 
-# Criar dados de teste (empresa + provider)
+# Verificar e corrigir schema (adiciona apenas o que falta, sem quebrar o que já existe)
 echo ""
-echo "Criando dados de teste..."
-php /var/www/html/scripts/create-test-data.php || echo "⚠ Dados de teste já existem ou script falhou"
+echo "Verificando e corrigindo schema..."
+php /var/www/html/scripts/check-and-fix-schema.php || echo "⚠ Verificação de schema falhou (pode ser normal se tudo já estiver correto)"
+
+# Criar dados de teste (empresa + provider) - DESABILITADO
+# Para criar dados de teste, execute manualmente: php scripts/create-test-data.php
+# echo ""
+# echo "Criando dados de teste..."
+# php /var/www/html/scripts/create-test-data.php || echo "⚠ Dados de teste já existem ou script falhou"
 
 echo ""
 echo "========================================"

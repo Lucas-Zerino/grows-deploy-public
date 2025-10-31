@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "send-messages-2025",
-		"name": "Enviar Mensagem",
-		"description": "Rotas para envio de mensagens - Padrão UAZAPI",
+		"name": "Enviar Mensagens",
+		"description": "Rotas para envio de mensagens - Padrão UAZAPI\n\n**Autenticação:** Todas as rotas requerem `Authorization: Bearer {{instance_token}}`\n\n**Compatibilidade:**\n- Aceita tanto `to` quanto `number` para destinatário\n- Aceita tanto `message` quanto `text` para texto\n- Aceita tanto `media` quanto `file` para mídia\n\n**Detecção automática:** O backend detecta automaticamente o provider (WAHA/UAZAPI) baseado na instância\n\n**Resposta:** Formato unificado UAZAPI",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -12,13 +12,23 @@
 				"method": "POST",
 				"header": [
 					{
+						"key": "Authorization",
+						"value": "Bearer {{instance_token}}",
+						"type": "text"
+					},
+					{
 						"key": "Content-Type",
 						"value": "application/json"
 					}
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"text\": \"Olá! Como posso ajudar?\",\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999,5511888888888\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_001\"\n}"
+					"raw": "{\n  \"to\": \"5511999999999\",\n  \"message\": \"Olá! Como posso ajudar?\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
 					"raw": "{{base_url}}/send/text",
@@ -30,7 +40,7 @@
 						"text"
 					]
 				},
-				"description": "Enviar mensagem de texto"
+				"description": "Enviar mensagem de texto\n\n**Parâmetros obrigatórios:**\n- `to` ou `number`: Número de telefone do destinatário (ex: `5511999999999`)\n- `message` ou `text`: Texto da mensagem\n\n**Parâmetros opcionais (compatibilidade UAZAPI):**\n- `replyid`: ID da mensagem para responder\n- `mentions`: Lista de números mencionados (separados por vírgula)\n- `readchat`: Marcar chat como lido após enviar\n- `readmessages`: Marcar mensagens como lidas\n- `delay`: Delay em milissegundos antes de enviar\n- `forward`: Se deve encaminhar a mensagem\n- `track_source`: Origem da requisição\n- `track_id`: ID para rastreamento\n\n**Exemplo de resposta:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"success\": true,\n    \"message\": \"Mensagem enviada com sucesso\",\n    \"message_id\": \"false_5511999999999@c.us_ABC123\"\n  }\n}\n```"
 			},
 			"response": []
 		},
@@ -40,13 +50,23 @@
 				"method": "POST",
 				"header": [
 					{
+						"key": "Authorization",
+						"value": "Bearer {{instance_token}}",
+						"type": "text"
+					},
+					{
 						"key": "Content-Type",
 						"value": "application/json"
 					}
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"type\": \"image\",\n  \"file\": \"https://example.com/image.jpg\",\n  \"text\": \"Veja esta foto!\",\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_002\"\n}"
+					"raw": "{\n  \"to\": \"5511999999999\",\n  \"type\": \"image\",\n  \"media\": \"https://example.com/image.jpg\",\n  \"caption\": \"Legenda da imagem\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
 					"raw": "{{base_url}}/send/media",
@@ -58,7 +78,7 @@
 						"media"
 					]
 				},
-				"description": "Enviar mídia (imagem, vídeo, áudio ou documento)"
+				"description": "Enviar mídia (imagem, vídeo, áudio ou documento)\n\n**Parâmetros obrigatórios:**\n- `to` ou `number`: Número de telefone do destinatário\n- `type`: Tipo da mídia - `image`, `video`, `audio`, `document` ou `file`\n- `media` ou `file`: URL da mídia\n\n**Parâmetros opcionais:**\n- `caption` ou `text`: Legenda da mídia\n- `replyid`: ID da mensagem para responder\n- `mentions`: Lista de números mencionados\n- `readchat`: Marcar chat como lido\n- `readmessages`: Marcar mensagens como lidas\n- `delay`: Delay em milissegundos\n- `forward`: Se deve encaminhar\n- `track_source`: Origem da requisição\n- `track_id`: ID para rastreamento\n\n**Tipos de mídia suportados:**\n- `image`: Imagens (JPG, PNG, GIF)\n- `video`: Vídeos (MP4)\n- `audio`: Áudios (OGG, MP3)\n- `document`: Documentos (PDF, DOC, etc.)"
 			},
 			"response": []
 		},
@@ -68,13 +88,23 @@
 				"method": "POST",
 				"header": [
 					{
+						"key": "Authorization",
+						"value": "Bearer {{instance_token}}",
+						"type": "text"
+					},
+					{
 						"key": "Content-Type",
 						"value": "application/json"
 					}
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"fullName\": \"João Silva\",\n  \"phoneNumber\": \"5511999999999,5511888888888\",\n  \"organization\": \"Empresa XYZ\",\n  \"email\": \"joao.silva@empresa.com\",\n  \"url\": \"https://empresa.com/joao\",\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_003\"\n}"
+					"raw": "{\n  \"to\": \"5511999999999\",\n  \"contact\": {\n    \"name\": \"João Silva\",\n    \"phone\": \"5511888888888\",\n    \"organization\": \"Empresa XYZ\",\n    \"email\": \"joao@empresa.com\",\n    \"url\": \"https://empresa.com/joao\"\n  }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
 					"raw": "{{base_url}}/send/contact",
@@ -86,7 +116,7 @@
 						"contact"
 					]
 				},
-				"description": "Enviar cartão de contato (vCard)"
+				"description": "Enviar cartão de contato (vCard)\n\n**Parâmetros obrigatórios:**\n- `to` ou `number`: Número de telefone do destinatário\n- `contact`: Objeto com dados do contato\n\n**Formato do contato (aceita ambos):**\n\n**Formato 1 - Campos individuais:**\n```json\n{\n  \"name\" ou \"fullName\": \"João Silva\",\n  \"phone\" ou \"phoneNumber\": \"5511888888888\",\n  \"organization\": \"Empresa XYZ\",\n  \"email\": \"joao@empresa.com\",\n  \"url\": \"https://empresa.com/joao\",\n  \"whatsappId\": \"5511888888888\"\n}\n```\n\n**Formato 2 - vCard completo:**\n```json\n{\n  \"vcard\": \"BEGIN:VCARD\\nVERSION:3.0\\nFN:João Silva\\nORG:Empresa XYZ;\\nTEL;type=CELL;type=VOICE;waid=5511888888888:+55 11 88888-8888\\nEND:VCARD\"\n}\n```\n\n**Parâmetros opcionais (compatibilidade UAZAPI):**\n- `replyid`: ID da mensagem para responder\n- `mentions`: Lista de números mencionados\n- `readchat`: Marcar chat como lido\n- `readmessages`: Marcar mensagens como lidas\n- `delay`: Delay em milissegundos\n- `forward`: Se deve encaminhar\n- `track_source`: Origem da requisição\n- `track_id`: ID para rastreamento"
 			},
 			"response": []
 		},
@@ -96,13 +126,23 @@
 				"method": "POST",
 				"header": [
 					{
+						"key": "Authorization",
+						"value": "Bearer {{instance_token}}",
+						"type": "text"
+					},
+					{
 						"key": "Content-Type",
 						"value": "application/json"
 					}
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"name\": \"MASP\",\n  \"address\": \"Av. Paulista, 1578 - Bela Vista\",\n  \"latitude\": -23.5616,\n  \"longitude\": -46.6562,\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_004\"\n}"
+					"raw": "{\n  \"to\": \"5511999999999\",\n  \"latitude\": -23.5616,\n  \"longitude\": -46.6562,\n  \"name\": \"MASP\",\n  \"address\": \"Av. Paulista, 1578 - Bela Vista, São Paulo\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
 				},
 				"url": {
 					"raw": "{{base_url}}/send/location",
@@ -114,119 +154,7 @@
 						"location"
 					]
 				},
-				"description": "Enviar localização geográfica"
-			},
-			"response": []
-		},
-		{
-			"name": "Send Menu",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"type\": \"button\",\n  \"text\": \"Escolha uma opção:\",\n  \"choices\": [\n    \"Suporte|suporte\",\n    \"Vendas|vendas\",\n    \"Site|https://example.com\"\n  ],\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_005\"\n}"
-				},
-				"url": {
-					"raw": "{{base_url}}/send/menu",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"send",
-						"menu"
-					]
-				},
-				"description": "Enviar menu interativo (botões, lista, enquete, carrossel)"
-			},
-			"response": []
-		},
-		{
-			"name": "Send Carousel",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"title\": \"Catálogo de Produtos\",\n  \"description\": \"Confira nossos produtos\",\n  \"images\": [\n    {\n      \"image\": \"https://example.com/produto1.jpg\",\n      \"title\": \"Produto 1\",\n      \"description\": \"Descrição do produto 1\",\n      \"button\": {\n        \"text\": \"Comprar\",\n        \"value\": \"comprar_produto1\"\n      }\n    },\n    {\n      \"image\": \"https://example.com/produto2.jpg\",\n      \"title\": \"Produto 2\",\n      \"description\": \"Descrição do produto 2\",\n      \"button\": {\n        \"text\": \"Comprar\",\n        \"value\": \"comprar_produto2\"\n      }\n    }\n  ],\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_006\"\n}"
-				},
-				"url": {
-					"raw": "{{base_url}}/send/carousel",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"send",
-						"carousel"
-					]
-				},
-				"description": "Enviar carrossel de mídia com botões"
-			},
-			"response": []
-		},
-		{
-			"name": "Request Location",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"number\": \"5511999999999\",\n  \"text\": \"Por favor, envie sua localização:\",\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_007\"\n}"
-				},
-				"url": {
-					"raw": "{{base_url}}/send/location-button",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"send",
-						"location-button"
-					]
-				},
-				"description": "Solicitar localização do usuário"
-			},
-			"response": []
-		},
-		{
-			"name": "Send Status",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"type\": \"text\",\n  \"text\": \"Status do dia: Tudo funcionando perfeitamente!\",\n  \"replyid\": \"3EB0538DA65A59F6D8A251\",\n  \"mentions\": \"5511999999999\",\n  \"readchat\": true,\n  \"readmessages\": true,\n  \"delay\": 1000,\n  \"forward\": false,\n  \"track_source\": \"postman\",\n  \"track_id\": \"msg_test_008\"\n}"
-				},
-				"url": {
-					"raw": "{{base_url}}/send/status",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"send",
-						"status"
-					]
-				},
-				"description": "Enviar Stories (Status)"
+				"description": "Enviar localização geográfica\n\n**Parâmetros obrigatórios:**\n- `to` ou `number`: Número de telefone do destinatário\n- `latitude`: Latitude da localização (número decimal)\n- `longitude`: Longitude da localização (número decimal)\n\n**Parâmetros opcionais:**\n- `name`: Nome do local (ex: \"MASP\", \"Shopping Center\")\n- `address`: Endereço completo do local\n\n**Parâmetros opcionais (compatibilidade UAZAPI):**\n- `replyid`: ID da mensagem para responder\n- `mentions`: Lista de números mencionados\n- `readchat`: Marcar chat como lido\n- `readmessages`: Marcar mensagens como lidas\n- `delay`: Delay em milissegundos\n- `forward`: Se deve encaminhar\n- `track_source`: Origem da requisição\n- `track_id`: ID para rastreamento\n\n**Exemplo:**\n```json\n{\n  \"to\": \"5511999999999\",\n  \"latitude\": -23.5616,\n  \"longitude\": -46.6562,\n  \"name\": \"MASP\",\n  \"address\": \"Av. Paulista, 1578 - Bela Vista\"\n}\n```"
 			},
 			"response": []
 		}

@@ -19,22 +19,38 @@ class SendController
             $data = json_decode(file_get_contents('php://input'), true);
             
             // Validar dados básicos
-            if (!isset($data['to']) || !is_string($data['to']) || empty(trim($data['to']))) {
-                return Response::error('To is required and must be a non-empty string', 400);
+            if (!isset($data['to']) && !isset($data['number'])) {
+                return Response::error('To/number is required', 400);
             }
-            if (!isset($data['message']) || !is_string($data['message']) || empty(trim($data['message']))) {
-                return Response::error('Message is required and must be a non-empty string', 400);
+            $to = $data['to'] ?? $data['number'];
+            
+            // Aceita tanto 'message' quanto 'text' (compatibilidade UAZAPI)
+            $message = $data['message'] ?? $data['text'] ?? '';
+            if (empty(trim($message))) {
+                return Response::error('Message/text is required and must be a non-empty string', 400);
             }
             
-            // Buscar instância pelo token
-            $instance = Instance::getByToken($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             if (!$instance) {
                 return Response::notFound('Instância não encontrada');
             }
             
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $to);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                return Response::error($errorMessage, 400);
+            }
+            
+            // Usar número validado
+            $validatedTo = $validation['validated_number'];
+            
             // Detectar provider e enviar mensagem
             $provider = ProviderManager::getProvider($instance['provider_id']);
-            $result = $provider->sendTextMessage($instance['external_id'], $data['to'], $data['message']);
+            $result = $provider->sendTextMessage($instance['external_instance_id'], $validatedTo, $message);
             
             return Response::success($result);
             
@@ -57,30 +73,46 @@ class SendController
             $data = json_decode(file_get_contents('php://input'), true);
             
             // Validar dados básicos
-            if (!isset($data['to']) || !is_string($data['to']) || empty(trim($data['to']))) {
-                return Response::error('To is required and must be a non-empty string', 400);
+            if (!isset($data['to']) && !isset($data['number'])) {
+                return Response::error('To/number is required', 400);
             }
-            if (!isset($data['media']) || !is_string($data['media']) || empty(trim($data['media']))) {
-                return Response::error('Media is required and must be a non-empty string', 400);
-            }
-            if (!isset($data['type']) || !is_string($data['type']) || empty(trim($data['type']))) {
-                return Response::error('Type is required and must be a non-empty string', 400);
+            $to = $data['to'] ?? $data['number'];
+            
+            // Aceita tanto 'media' quanto 'file' (compatibilidade UAZAPI)
+            $media = $data['media'] ?? $data['file'] ?? null;
+            if (!$media || !is_string($media) || empty(trim($media))) {
+                return Response::error('Media/file is required and must be a non-empty string', 400);
             }
             
-            // Buscar instância pelo token
-            $instance = Instance::getByToken($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            // Tipo da mídia (image, video, audio, document)
+            $type = $data['type'] ?? 'image';
+            
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             if (!$instance) {
                 return Response::notFound('Instância não encontrada');
             }
             
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $to);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                return Response::error($errorMessage, 400);
+            }
+            
+            // Usar número validado
+            $validatedTo = $validation['validated_number'];
+            
             // Detectar provider e enviar mídia
             $provider = ProviderManager::getProvider($instance['provider_id']);
             $result = $provider->sendMediaMessage(
-                $instance['external_id'], 
-                $data['to'], 
-                $data['type'], 
-                $data['media'], 
-                $data['caption'] ?? ''
+                $instance['external_instance_id'], 
+                $validatedTo, 
+                $type, 
+                $media, 
+                $data['caption'] ?? $data['text'] ?? ''
             );
             
             return Response::success($result);
@@ -104,24 +136,58 @@ class SendController
             $data = json_decode(file_get_contents('php://input'), true);
             
             // Validar dados básicos
-            if (!isset($data['to']) || !is_string($data['to']) || empty(trim($data['to']))) {
-                return Response::error('To is required and must be a non-empty string', 400);
+            if (!isset($data['to']) && !isset($data['number'])) {
+                return Response::error('To/number is required', 400);
             }
-            if (!isset($data['contact']) || !is_array($data['contact'])) {
+            $to = $data['to'] ?? $data['number'];
+            
+            // Aceita tanto 'contact' quanto os campos separados (compatibilidade UAZAPI)
+            $contact = $data['contact'] ?? null;
+            if (!$contact && isset($data['fullName'])) {
+                $contact = [
+                    'name' => $data['fullName'] ?? '',
+                    'fullName' => $data['fullName'] ?? '',
+                    'phone' => $data['phoneNumber'] ?? $data['phone'] ?? '',
+                    'phoneNumber' => $data['phoneNumber'] ?? $data['phone'] ?? '',
+                    'organization' => $data['organization'] ?? '',
+                    'email' => $data['email'] ?? '',
+                    'url' => $data['url'] ?? ''
+                ];
+            }
+            
+            if (!$contact || !is_array($contact)) {
                 return Response::error('Contact is required and must be an array', 400);
             }
             
-            // Buscar instância pelo token
-            $instance = Instance::getByToken($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             if (!$instance) {
                 return Response::notFound('Instância não encontrada');
             }
             
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $to);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                return Response::error($errorMessage, 400);
+            }
+            
+            // Usar número validado
+            $validatedTo = $validation['validated_number'];
+            
             // Detectar provider e enviar contato
             $provider = ProviderManager::getProvider($instance['provider_id']);
             
-            // Contact sending not implemented in provider interface
-            return Response::error('Envio de contatos não implementado', 501);
+            // Verificar se o provider suporta envio de contato (WAHA tem, UAZAPI pode não ter)
+            if (!method_exists($provider, 'sendContact')) {
+                return Response::error('Provider não suporta envio de contatos', 501);
+            }
+            
+            $result = call_user_func([$provider, 'sendContact'], $instance['external_instance_id'], $validatedTo, $contact);
+            
+            return Response::success($result);
             
         } catch (\Exception $e) {
             Logger::error('Send contact failed', [
@@ -142,9 +208,11 @@ class SendController
             $data = json_decode(file_get_contents('php://input'), true);
             
             // Validar dados básicos
-            if (!isset($data['to']) || !is_string($data['to']) || empty(trim($data['to']))) {
-                return Response::error('To is required and must be a non-empty string', 400);
+            if (!isset($data['to']) && !isset($data['number'])) {
+                return Response::error('To/number is required', 400);
             }
+            $to = $data['to'] ?? $data['number'];
+            
             if (!isset($data['latitude']) || !is_numeric($data['latitude'])) {
                 return Response::error('Latitude is required and must be numeric', 400);
             }
@@ -152,17 +220,40 @@ class SendController
                 return Response::error('Longitude is required and must be numeric', 400);
             }
             
-            // Buscar instância pelo token
-            $instance = Instance::getByToken($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             if (!$instance) {
                 return Response::notFound('Instância não encontrada');
             }
             
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $to);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                return Response::error($errorMessage, 400);
+            }
+            
+            // Usar número validado
+            $validatedTo = $validation['validated_number'];
+            
             // Detectar provider e enviar localização
             $provider = ProviderManager::getProvider($instance['provider_id']);
             
-            // Location sending not implemented in provider interface
-            return Response::error('Envio de localização não implementado', 501);
+            // Verificar se o provider suporta envio de localização
+            if (!method_exists($provider, 'sendLocation')) {
+                return Response::error('Provider não suporta envio de localização', 501);
+            }
+            
+            $latitude = floatval($data['latitude']);
+            $longitude = floatval($data['longitude']);
+            $name = $data['name'] ?? null;
+            $address = $data['address'] ?? null;
+            
+            $result = call_user_func([$provider, 'sendLocation'], $instance['external_instance_id'], $validatedTo, $latitude, $longitude, $name, $address);
+            
+            return Response::success($result);
             
         } catch (\Exception $e) {
             Logger::error('Send location failed', [

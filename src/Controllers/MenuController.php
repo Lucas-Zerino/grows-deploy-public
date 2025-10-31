@@ -40,19 +40,33 @@ class MenuController
         }
         
         try {
-            // Buscar instância ativa
-            $instance = Instance::findFirstActive();
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             
             if (!$instance) {
-                Response::error('Nenhuma instância ativa encontrada');
+                Response::notFound('Instância não encontrada');
                 return;
             }
+            
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $number = $input['number'] ?? $input['to'] ?? '';
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $number);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                Response::error($errorMessage, 400);
+                return;
+            }
+            
+            // Usar número validado
+            $validatedNumber = $validation['validated_number'];
             
             Database::beginTransaction();
             
             // Preparar payload base para WAHA
             $wahaPayload = [
-                'chatId' => $input['number'] . '@s.whatsapp.net',
+                'chatId' => $validatedNumber . '@s.whatsapp.net',
                 'session' => $instance['external_instance_id']
             ];
             
@@ -74,9 +88,9 @@ class MenuController
                     break;
                     
                 case 'carousel':
-                    $wahaPayload = self::processCarousel($input, $wahaPayload);
-                    $wahaMethod = 'sendButtons'; // WAHA usa sendButtons para carrossel
-                    break;
+                    // Carrossel agora é tratado no método sendCarousel separadamente
+                    Response::validationError(['type' => 'Use /send/carousel para enviar carrossel']);
+                    return;
                     
                 default:
                     Response::validationError(['type' => 'Tipo de menu não suportado']);
@@ -89,13 +103,14 @@ class MenuController
             }
             
             // Criar mensagem no banco
+            // message_type deve ser um dos valores permitidos: text, image, video, audio, document, location, contact
             $message = \App\Models\Message::create([
                 'instance_id' => $instance['id'],
                 'company_id' => $instance['company_id'],
                 'direction' => 'outbound',
-                'phone_to' => $input['number'],
+                'phone_to' => $validatedNumber,
                 'phone_from' => $instance['phone_number'] ?? '',
-                'message_type' => 'menu_' . $input['type'],
+                'message_type' => 'text', // Menu é enviado como text com botões/interatividade
                 'content' => json_encode([
                     'type' => $input['type'],
                     'text' => $input['text'],
@@ -119,8 +134,8 @@ class MenuController
                 'instance_id' => $instance['id'],
                 'provider_id' => $instance['provider_id'],
                 'external_instance_id' => $instance['external_instance_id'],
-                'phone_to' => $input['number'],
-                'message_type' => 'menu_' . $input['type'],
+                'phone_to' => $validatedNumber,
+                'message_type' => 'text', // Menu é enviado como text com botões
                 'content' => $message['content'],
                 'waha_payload' => $wahaPayload,
                 'waha_method' => $wahaMethod,
@@ -161,16 +176,27 @@ class MenuController
     {
         $input = Router::getJsonInput();
         
-        // Validação básica
+        // Validação básica - aceita tanto formato antigo quanto novo
         $errors = [];
-        if (empty($input['number'])) {
-            $errors['number'] = 'Número é obrigatório';
+        
+        // Aceita 'number' ou 'to'
+        $number = $input['number'] ?? $input['to'] ?? null;
+        if (empty($number)) {
+            $errors['number'] = 'Número é obrigatório (use "number" ou "to")';
         }
-        if (empty($input['text'])) {
-            $errors['text'] = 'Texto é obrigatório';
+        
+        // Aceita 'text' ou usa 'description' se não tiver text
+        $text = $input['text'] ?? $input['description'] ?? null;
+        if (empty($text)) {
+            $errors['text'] = 'Texto/Descrição é obrigatório (use "text" ou "description")';
         }
-        if (empty($input['carousel'])) {
-            $errors['carousel'] = 'Carrossel é obrigatório';
+        
+        // Aceita 'carousel' ou 'images' (formato novo)
+        $carousel = $input['carousel'] ?? null;
+        $images = $input['images'] ?? null;
+        
+        if (empty($carousel) && empty($images)) {
+            $errors['carousel'] = 'Carrossel é obrigatório (use "carousel" ou "images")';
         }
         
         if (!empty($errors)) {
@@ -179,25 +205,56 @@ class MenuController
         }
         
         try {
-            // Buscar instância ativa
-            $instance = Instance::findFirstActive();
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             
             if (!$instance) {
-                Response::error('Nenhuma instância ativa encontrada');
+                Response::notFound('Instância não encontrada');
                 return;
             }
             
-            Database::beginTransaction();
+            // Normalizar dados
+            $number = $input['number'] ?? $input['to'] ?? '';
+            
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $number);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                Response::error($errorMessage, 400);
+                return;
+            }
+            
+            // Usar número validado
+            $validatedNumber = $validation['validated_number'];
+            
+            $text = $input['text'] ?? $input['description'] ?? '';
+            $carouselData = $input['carousel'] ?? null;
+            $images = $input['images'] ?? null;
+            
+            // Se tiver 'images' (formato novo), converter para formato interno
+            if ($images && !$carouselData) {
+                $carouselData = [];
+                foreach ($images as $image) {
+                    $carouselData[] = [
+                        'image' => $image['image'] ?? $image['imageUrl'] ?? '',
+                        'title' => $image['title'] ?? '',
+                        'description' => $image['description'] ?? '',
+                        'button' => $image['button'] ?? null
+                    ];
+                }
+            }
             
             // Preparar payload para WAHA
             $wahaPayload = [
-                'chatId' => $input['number'] . '@s.whatsapp.net',
+                'chatId' => $validatedNumber . '@s.whatsapp.net',
                 'session' => $instance['external_instance_id'],
-                'text' => $input['text']
+                'body' => $text // WAHA usa 'body' para sendButtons
             ];
             
             // Processar carrossel
-            $wahaPayload = self::processCarouselItems($input['carousel'], $wahaPayload);
+            $wahaPayload = self::processCarouselItems($carouselData, $wahaPayload);
             
             // Adicionar campos opcionais
             if (!empty($input['replyid'])) {
@@ -209,12 +266,12 @@ class MenuController
                 'instance_id' => $instance['id'],
                 'company_id' => $instance['company_id'],
                 'direction' => 'outbound',
-                'phone_to' => $input['number'],
+                'phone_to' => $validatedNumber,
                 'phone_from' => $instance['phone_number'] ?? '',
-                'message_type' => 'carousel',
+                'message_type' => 'text', // Carrossel é enviado como text com botões
                 'content' => json_encode([
-                    'text' => $input['text'],
-                    'carousel' => $input['carousel'],
+                    'text' => $text,
+                    'carousel' => $carouselData,
                 ]),
                 'status' => 'queued',
                 'priority' => 5,
@@ -231,8 +288,8 @@ class MenuController
                 'instance_id' => $instance['id'],
                 'provider_id' => $instance['provider_id'],
                 'external_instance_id' => $instance['external_instance_id'],
-                'phone_to' => $input['number'],
-                'message_type' => 'carousel',
+                'phone_to' => $validatedNumber,
+                'message_type' => 'text', // Carrossel é enviado como text com botões
                 'content' => $message['content'],
                 'waha_payload' => $wahaPayload,
                 'waha_method' => 'sendButtons',
@@ -242,7 +299,7 @@ class MenuController
             Logger::info('Carrossel enfileirado', [
                 'message_id' => $message['id'],
                 'instance_id' => $instance['id'],
-                'number' => $input['number'],
+                'number' => $number,
             ]);
             
             Response::success([
@@ -286,26 +343,40 @@ class MenuController
         }
         
         try {
-            // Buscar instância ativa
-            $instance = Instance::findFirstActive();
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             
             if (!$instance) {
-                Response::error('Nenhuma instância ativa encontrada');
+                Response::notFound('Instância não encontrada');
                 return;
             }
+            
+            // Validar e normalizar número brasileiro (com/sem dígito 9)
+            $number = $input['number'] ?? $input['to'] ?? '';
+            $validation = \App\Utils\PhoneValidator::validateBrazilianPhone($instance['id'], $number);
+            if (!$validation['is_valid']) {
+                $errorMessage = $validation['error'] ?? 'Número de telefone inválido no WhatsApp';
+                Response::error($errorMessage, 400);
+                return;
+            }
+            
+            // Usar número validado
+            $validatedNumber = $validation['validated_number'];
             
             Database::beginTransaction();
             
             // Preparar payload para WAHA (usar botões com solicitação de localização)
             $wahaPayload = [
-                'chatId' => $input['number'] . '@s.whatsapp.net',
+                'chatId' => $validatedNumber . '@s.whatsapp.net',
                 'session' => $instance['external_instance_id'],
-                'text' => $input['text'],
+                'body' => $input['text'], // WAHA usa 'body' para sendButtons
                 'buttons' => [
                     [
-                        'id' => 'request_location',
+                        'type' => 'reply',
                         'text' => '📍 Compartilhar Localização',
-                        'type' => 'LOCATION'
+                        'id' => 'request_location'
                     ]
                 ]
             ];
@@ -315,9 +386,9 @@ class MenuController
                 'instance_id' => $instance['id'],
                 'company_id' => $instance['company_id'],
                 'direction' => 'outbound',
-                'phone_to' => $input['number'],
+                'phone_to' => $validatedNumber,
                 'phone_from' => $instance['phone_number'] ?? '',
-                'message_type' => 'location_request',
+                'message_type' => 'location', // Solicitação de localização usa tipo location
                 'content' => $input['text'],
                 'status' => 'queued',
                 'priority' => 5,
@@ -334,8 +405,8 @@ class MenuController
                 'instance_id' => $instance['id'],
                 'provider_id' => $instance['provider_id'],
                 'external_instance_id' => $instance['external_instance_id'],
-                'phone_to' => $input['number'],
-                'message_type' => 'location_request',
+                'phone_to' => $validatedNumber,
+                'message_type' => 'location', // Solicitação de localização usa tipo location
                 'content' => $input['text'],
                 'waha_payload' => $wahaPayload,
                 'waha_method' => 'sendButtons',
@@ -386,13 +457,17 @@ class MenuController
         }
         
         try {
-            // Buscar instância ativa
-            $instance = Instance::findFirstActive();
+            // Buscar instância pelo token (remover "Bearer " se presente)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            $token = str_replace('Bearer ', '', $authHeader);
+            $instance = Instance::getByToken($token);
             
             if (!$instance) {
-                Response::error('Nenhuma instância ativa encontrada');
+                Response::notFound('Instância não encontrada');
                 return;
             }
+            
+            // Status não precisa validar número (não tem destinatário específico)
             
             Database::beginTransaction();
             
@@ -404,7 +479,6 @@ class MenuController
             // Processar por tipo de status
             switch ($input['type']) {
                 case 'text':
-                    $wahaPayload['text'] = $input['text'] ?? '';
                     // WAHA não suporta cores de fundo para status de texto
                     break;
                     
@@ -434,7 +508,7 @@ class MenuController
                 'direction' => 'outbound',
                 'phone_to' => 'status', // Status não tem destinatário específico
                 'phone_from' => $instance['phone_number'] ?? '',
-                'message_type' => 'status_' . $input['type'],
+                'message_type' => 'text', // Status é enviado como text (histórias)
                 'content' => json_encode([
                     'type' => $input['type'],
                     'text' => $input['text'] ?? null,
@@ -458,7 +532,7 @@ class MenuController
                 'provider_id' => $instance['provider_id'],
                 'external_instance_id' => $instance['external_instance_id'],
                 'phone_to' => 'status',
-                'message_type' => 'status_' . $input['type'],
+                'message_type' => 'text', // Status é enviado como text (histórias)
                 'content' => $message['content'],
                 'waha_payload' => $wahaPayload,
                 'waha_method' => 'sendStatus',
@@ -493,12 +567,33 @@ class MenuController
     
     private static function processButtons(array $input, array $wahaPayload): array
     {
-        $wahaPayload['text'] = $input['text'];
+        // WAHA usa 'body' ao invés de 'text'
+        $wahaPayload['body'] = $input['text'];
         $wahaPayload['buttons'] = [];
         
         foreach ($input['choices'] as $choice) {
             $button = self::parseButtonChoice($choice);
-            $wahaPayload['buttons'][] = $button;
+            // WAHA espera: type (reply/url/call), text, e opcionalmente id, url, phoneNumber
+            $wahaButton = [
+                'type' => strtolower($button['type']), // reply, url, call, copy
+                'text' => $button['text']
+            ];
+            
+            // Adicionar campos específicos por tipo
+            if ($button['type'] === 'URL') {
+                $wahaButton['url'] = $button['id'];
+            } elseif ($button['type'] === 'CALL') {
+                $wahaButton['phoneNumber'] = $button['id'];
+            } elseif ($button['type'] === 'COPY') {
+                $wahaButton['copyCode'] = $button['id'];
+            } else {
+                // REPLY - usar id se diferente do text
+                if ($button['id'] !== $button['text']) {
+                    $wahaButton['id'] = $button['id'];
+                }
+            }
+            
+            $wahaPayload['buttons'][] = $wahaButton;
         }
         
         if (!empty($input['footerText'])) {
@@ -510,8 +605,14 @@ class MenuController
     
     private static function processList(array $input, array $wahaPayload): array
     {
-        $wahaPayload['text'] = $input['text'];
-        $wahaPayload['sections'] = [];
+        // WAHA sendList usa formato: message { title, description, footer, button, sections }
+        $wahaPayload['message'] = [
+            'title' => $input['text'] ?? '',
+            'description' => $input['description'] ?? '',
+            'footer' => $input['footerText'] ?? null,
+            'button' => $input['listButton'] ?? 'Escolher',
+            'sections' => []
+        ];
         
         $currentSection = null;
         foreach ($input['choices'] as $choice) {
@@ -521,22 +622,28 @@ class MenuController
                     'title' => trim($choice, '[]'),
                     'rows' => []
                 ];
-                $wahaPayload['sections'][] = $currentSection;
+                $wahaPayload['message']['sections'][] = &$currentSection;
             } else {
                 // Item da lista
                 $item = self::parseListItem($choice);
+                // WAHA espera: rowId, title, description (opcional)
+                $wahaItem = [
+                    'rowId' => $item['id'],
+                    'title' => $item['title']
+                ];
+                if (!empty($item['description'])) {
+                    $wahaItem['description'] = $item['description'];
+                }
+                
                 if ($currentSection) {
-                    $currentSection['rows'][] = $item;
+                    $currentSection['rows'][] = $wahaItem;
                 }
             }
         }
         
-        if (!empty($input['listButton'])) {
-            $wahaPayload['buttonText'] = $input['listButton'];
-        }
-        
-        if (!empty($input['footerText'])) {
-            $wahaPayload['footer'] = $input['footerText'];
+        // Remover footer se null
+        if ($wahaPayload['message']['footer'] === null) {
+            unset($wahaPayload['message']['footer']);
         }
         
         return $wahaPayload;
@@ -556,42 +663,35 @@ class MenuController
         return $wahaPayload;
     }
     
-    private static function processCarousel(array $input, array $wahaPayload): array
-    {
-        $wahaPayload['text'] = $input['text'];
-        $wahaPayload['buttons'] = [];
-        
-        foreach ($input['choices'] as $choice) {
-            if (strpos($choice, '[') === 0) {
-                // Texto do cartão - ignorar por enquanto
-                continue;
-            } elseif (strpos($choice, '{') === 0) {
-                // Imagem do cartão - ignorar por enquanto
-                continue;
-            } else {
-                // Botão do cartão
-                $button = self::parseButtonChoice($choice);
-                $wahaPayload['buttons'][] = $button;
-            }
-        }
-        
-        return $wahaPayload;
-    }
     
     private static function processCarouselItems(array $carousel, array $wahaPayload): array
     {
+        // WAHA não tem suporte nativo para carrossel, então convertemos para botões com imagens no header
         $wahaPayload['buttons'] = [];
+        $firstImage = null;
         
         foreach ($carousel as $item) {
-            if (isset($item['buttons'])) {
-                foreach ($item['buttons'] as $button) {
-                    $wahaPayload['buttons'][] = [
-                        'id' => $button['id'],
-                        'text' => $button['text'],
-                        'type' => $button['type']
-                    ];
-                }
+            // Pegar primeira imagem para usar como headerImage
+            if (!$firstImage && isset($item['image']) && !empty($item['image'])) {
+                $firstImage = [
+                    'url' => $item['image'],
+                    'mimetype' => 'image/jpeg'
+                ];
             }
+            
+            // Adicionar botões de cada item
+            if (isset($item['button']) && is_array($item['button'])) {
+                $wahaPayload['buttons'][] = [
+                    'type' => 'reply',
+                    'text' => $item['button']['text'] ?? 'Ver',
+                    'id' => $item['button']['value'] ?? $item['button']['id'] ?? 'button_' . count($wahaPayload['buttons'])
+                ];
+            }
+        }
+        
+        // Adicionar headerImage se tiver
+        if ($firstImage) {
+            $wahaPayload['headerImage'] = $firstImage;
         }
         
         return $wahaPayload;
@@ -628,3 +728,5 @@ class MenuController
         ];
     }
 }
+
+

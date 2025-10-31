@@ -5,7 +5,9 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use App\Services\QueueService;
 use App\Models\Instance;
 use App\Models\InstanceWebhook;
+use App\Models\Company;
 use App\Utils\Logger;
+use App\Utils\Database;
 use GuzzleHttp\Client;
 use Dotenv\Dotenv;
 
@@ -36,12 +38,7 @@ try {
     
     $httpClient = new Client(['timeout' => 10]);
     
-    // Consumir do exchange com routing pattern wildcard
-    $exchangeName = 'messaging.inbound.exchange';
-    $routingPattern = 'company.*'; // Routing key pattern
-    
-    echo "Consuming events from exchange: {$exchangeName} with pattern: {$routingPattern}\n";
-    
+    // Callback compartilhado para processar eventos
     $callback = function (array $data, $msg) use ($httpClient) {
         pcntl_signal_dispatch();
         
@@ -73,6 +70,7 @@ try {
                     }
                 } else {
                     // Buscar instância pelo external_instance_id (WAHA/UAZAPI)
+                    // O external_instance_id vem no formato: company_id-instance_name (ex: "11-1515")
                     $instance = Instance::getByExternalInstanceId($instanceId);
                 }
                 
@@ -80,9 +78,16 @@ try {
                     // Buscar webhooks ativos da instância específica
                     $webhooks = InstanceWebhook::getActiveByInstanceId($instance['id']);
                     
+                    Logger::debug('Instance found, checking webhooks', [
+                        'instance_id' => $instance['id'],
+                        'instance_name' => $instance['instance_name'] ?? null,
+                        'webhooks_count' => count($webhooks),
+                        'legacy_webhook_url' => $instance['webhook_url'] ?? null
+                    ]);
+                    
                     // Adicionar webhook legado se existir (para compatibilidade)
                     if ($instance['webhook_url']) {
-                        $defaultEvents = ['message', 'message.any', 'message.ack', 'message.reaction', 'message.revoked', 'message.edited', 'session.status', 'presence.update', 'group.v2.join', 'group.v2.leave', 'group.v2.update', 'group.v2.participants', 'poll.vote', 'chat.archive', 'call.received', 'call.accepted', 'call.rejected', 'label.upsert', 'label.deleted', 'label.chat.added', 'label.chat.deleted', 'event.response', 'event.response.failed', 'engine.event'];
+                        $defaultEvents = ['message', 'message.any', 'message.ack', 'message.reaction', 'message.revoked', 'message.edited', 'session.status', 'state.change', 'presence.update', 'group.v2.join', 'group.v2.leave', 'group.v2.update', 'group.v2.participants', 'poll.vote', 'chat.archive', 'call.received', 'call.accepted', 'call.rejected', 'label.upsert', 'label.deleted', 'label.chat.added', 'label.chat.deleted', 'event.response', 'event.response.failed', 'engine.event', 'on-connected', 'on-disconnected', 'on-message', 'on-message-sent', 'on-message-delivered', 'on-message-read'];
                         
                         // Adicionar eventos do Instagram se for instância Instagram
                         if ($isInstagramEvent) {
@@ -101,17 +106,26 @@ try {
                             'is_active' => true
                         ];
                     }
+                } else {
+                    Logger::warning('Instance not found for event', [
+                        'instance_id' => $instanceId,
+                        'event_type' => $eventType,
+                        'payload_keys' => array_keys($data)
+                    ]);
                 }
             }
             
             // Enviar evento para todos os webhooks compatíveis
             if (!empty($webhooks)) {
+                // Formatar evento para cliente: extrair apenas o nome da instância (sem company_id-)
+                $clientEvent = formatEventForClient($data, $instance ?? null);
+                
                 foreach ($webhooks as $webhook) {
                     // Verificar se o webhook deve receber este tipo de evento
                     if (shouldSendToWebhook($eventType, $webhook['events'])) {
                         try {
                             $response = $httpClient->post($webhook['webhook_url'], [
-                                'json' => $data, // Já está no formato UAZAPI após tradução
+                                'json' => $clientEvent, // Evento formatado para cliente (instance_id sem company_id-)
                                 'headers' => [
                                     'Content-Type' => 'application/json',
                                     'X-Webhook-Source' => 'GrowHub-Gateway',
@@ -157,12 +171,31 @@ try {
                             'event_type' => $eventType,
                             'configured_events' => $webhook['events']
                         ]);
+                        
+                        // Log mais detalhado para eventos de conexão/desconexão
+                        if (in_array($eventType, ['on-connected', 'on-disconnected', 'session.status', 'state.change'])) {
+                            Logger::info('Connection event skipped by webhook filter', [
+                                'instance_id' => $instanceId,
+                                'webhook_url' => $webhook['webhook_url'],
+                                'event_type' => $eventType,
+                                'configured_events' => $webhook['events']
+                            ]);
+                        }
                     }
                 }
             } else {
-                Logger::debug('No webhooks configured for instance', [
-                    'instance_id' => $instanceId,
-                ]);
+                if ($instanceId) {
+                    Logger::warning('No webhooks configured for instance', [
+                        'instance_id' => $instanceId,
+                        'event_type' => $eventType,
+                        'note' => 'Check if instance exists and has webhook_url or active instance_webhooks'
+                    ]);
+                } else {
+                    Logger::warning('No instance_id found in event payload', [
+                        'event_type' => $eventType,
+                        'payload_keys' => array_keys($data)
+                    ]);
+                }
             }
             
             return true; // ACK
@@ -176,7 +209,19 @@ try {
         }
     };
     
-    QueueService::consumeFromExchange($exchangeName, $routingPattern, $callback, 10);
+    // Consumir do exchange com routing pattern wildcard
+    // Isso vai receber TODAS as novas mensagens que chegarem
+    // Para mensagens antigas presas nas filas persistentes, será necessário
+    // processar manualmente ou usar um script separado
+    $exchangeName = 'messaging.inbound.exchange';
+    $routingPattern = 'company.*';
+    
+    echo "Consuming events from exchange: {$exchangeName} with pattern: {$routingPattern}\n";
+    echo "Prefetch: 50 (para processar mensagens mais rápido)\n";
+    echo "NOTA: Mensagens antigas nas filas persistentes precisam ser processadas separadamente\n\n";
+    
+    // Prefetch maior para processar mais rápido
+    QueueService::consumeFromExchange($exchangeName, $routingPattern, $callback, 50);
     
 } catch (\Exception $e) {
     Logger::critical('Event Processor Worker crashed', [
@@ -186,6 +231,46 @@ try {
     
     echo "Worker crashed: {$e->getMessage()}\n";
     exit(1);
+}
+
+/**
+ * Formata evento para enviar ao cliente final
+ * Extrai apenas o nome da instância (sem company_id-) do instance_id
+ */
+function formatEventForClient(array $event, ?array $instance): array
+{
+    $clientEvent = $event;
+    
+    // Prioridade 1: Se tiver a instância do banco, usar instance_name diretamente
+    if ($instance && isset($instance['instance_name'])) {
+        $clientEvent['instance_id'] = $instance['instance_name'];
+    }
+    // Prioridade 2: Se o instance_id estiver no formato company_id-instance_name, extrair apenas o nome
+    elseif (isset($clientEvent['instance_id'])) {
+        $instanceId = $clientEvent['instance_id'];
+        
+        // Se for formato "11-1515", extrair apenas "1515"
+        if (strpos($instanceId, '-') !== false) {
+            $parts = explode('-', $instanceId, 2);
+            if (count($parts) === 2 && is_numeric($parts[0])) {
+                $clientEvent['instance_id'] = $parts[1]; // Retorna apenas o nome da instância
+            }
+        }
+    }
+    // Prioridade 3: Se tiver instance_name no próprio evento, usar
+    elseif (isset($clientEvent['instance_name'])) {
+        $clientEvent['instance_id'] = $clientEvent['instance_name'];
+    }
+    
+    // Também formatar o campo 'session' se existir e estiver no mesmo formato
+    if (isset($clientEvent['session']) && is_string($clientEvent['session']) && strpos($clientEvent['session'], '-') !== false) {
+        $parts = explode('-', $clientEvent['session'], 2);
+        if (count($parts) === 2 && is_numeric($parts[0])) {
+            $clientEvent['session'] = $parts[1];
+        }
+    }
+    
+    return $clientEvent;
 }
 
 /**
@@ -214,6 +299,8 @@ function shouldSendToWebhook(string $eventType, array $configuredEvents): bool
         // Eventos de sessão
         'session.status' => ['session.status', 'state.change'],
         'state.change' => ['session.status', 'state.change'],
+        'on-connected' => ['session.status', 'state.change', 'on-connected'],
+        'on-disconnected' => ['session.status', 'state.change', 'on-disconnected'],
         
         // Eventos de presença
         'presence.update' => ['presence.update'],

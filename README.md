@@ -97,4 +97,4 @@ make help           # Ver todos os comandos disponíveis
 
 ### 🌟 Começar Aqui
  docker compose -f docker-compose.dev.yml up -d
- docker-compose -f docker-compose.dev.yml exec php-fpm php scripts/run-migration.php
+ docker compose -f docker-compose.dev.yml exec php-fpm php scripts/run-migration.php
