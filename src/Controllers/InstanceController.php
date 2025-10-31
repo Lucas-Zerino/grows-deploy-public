@@ -439,6 +439,25 @@ class InstanceController
     
     /**
      * Verificar status da instância
+     * Retorna formato padronizado sempre o mesmo, independente do provider
+     * 
+     * Formato de resposta:
+     * {
+     *   "instance": {
+     *     "id": "...",
+     *     "token": "...",
+     *     "status": "connected", // sempre um dos: stopped, connecting, scan_qr_code, connected, failed
+     *     "name": "...",
+     *     "qrcode": "...", // apenas quando status = scan_qr_code
+     *     "profileName": "...",
+     *     ...
+     *   },
+     *   "status": {
+     *     "connected": true,
+     *     "loggedIn": true,
+     *     "jid": {...}
+     *   }
+     * }
      */
     public function status()
     {
@@ -447,25 +466,25 @@ class InstanceController
             $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
             $token = str_replace('Bearer ', '', $authHeader);
             
-            Logger::info('Instance connect attempt', [
-                'auth_header' => $authHeader,
-                'token' => $token
-            ]);
-            
             // Buscar instância pelo token
             $instance = Instance::getByToken($token);
             if (!$instance) {
                 return Response::notFound('Instância não encontrada');
             }
             
-            // Detectar provider e buscar status
+            // Detectar provider e buscar status (retorna formato padronizado)
             $provider = ProviderManager::getProvider($instance['provider_id']);
-            $result = $provider->getStatus($instance['external_instance_id'] ?? self::formatInstanceName($instance));
+            $statusResult = $provider->getStatus($instance['external_instance_id'] ?? self::formatInstanceName($instance));
             
-            // Adicionar informações da instância
-            $result['instance'] = $instance;
+            // Se houver erro no provider, retornar erro
+            if (!$statusResult['success']) {
+                return Response::error($statusResult['message'] ?? 'Erro ao obter status', 500);
+            }
             
-            return Response::success($result);
+            // Formatar resposta final usando formato padronizado + dados do banco
+            $formattedResponse = $this->formatStatusResponse($instance, $statusResult);
+            
+            return Response::success($formattedResponse);
             
         } catch (\Exception $e) {
             Logger::error('Instance status failed', [
@@ -475,6 +494,43 @@ class InstanceController
             
             return Response::serverError('Erro interno do servidor');
         }
+    }
+    
+    /**
+     * Formatar resposta de status no formato padronizado
+     * Usa dados do banco + formato padronizado retornado pelo provider
+     * 
+     * @param array $instance Dados da instância do banco
+     * @param array $statusResult Formato padronizado retornado pelo provider
+     * @return array Resposta formatada
+     */
+    private function formatStatusResponse(array $instance, array $statusResult): array
+    {
+        return [
+            'instance' => [
+                'id' => (string)$instance['id'],
+                'token' => $instance['token'],
+                'status' => $statusResult['status'] ?? 'unknown', // Status padronizado
+                'name' => $instance['instance_name'],
+                'qrcode' => $statusResult['qrcode'] ?? null, // Apenas quando scan_qr_code
+                'paircode' => null, // WAHA não usa paircode
+                'profileName' => $statusResult['profile_name'] ?? null,
+                'profilePicUrl' => $statusResult['profile_pic_url'] ?? null,
+                'isBusiness' => false, // WAHA não fornece essa informação
+                'platform' => 'WAHA',
+                'systemName' => 'waha',
+                'owner' => null,
+                'lastDisconnect' => null,
+                'lastDisconnectReason' => null,
+                'created' => $instance['created_at'],
+                'updated' => $instance['updated_at'],
+            ],
+            'status' => [
+                'connected' => $statusResult['connected'] ?? false,
+                'loggedIn' => $statusResult['loggedIn'] ?? false,
+                'jid' => $statusResult['jid'] ?? null
+            ]
+        ];
     }
     
     /**

@@ -179,7 +179,21 @@ class WahaInstanceProvider
     
     /**
      * Obter status da instância
-     * Padrão UAZAPI: GET /instance/status
+     * Retorna formato padronizado que será usado pelo controller para formatar resposta final
+     * 
+     * Formato padronizado retornado:
+     * [
+     *   'success' => true,
+     *   'status' => 'connected', // stopped, connecting, scan_qr_code, connected, failed
+     *   'connected' => true,
+     *   'loggedIn' => true,
+     *   'jid' => [...],
+     *   'qrcode' => '...', // apenas quando scan_qr_code
+     *   'profile_name' => '...',
+     *   'profile_pic_url' => '...',
+     *   'provider_status' => 'WORKING', // status original do provider
+     *   'provider_status_description' => '...'
+     * ]
      */
     public function getStatus(string $externalInstanceId): array
     {
@@ -187,42 +201,73 @@ class WahaInstanceProvider
             $response = $this->client->get("/api/sessions/{$externalInstanceId}");
             $data = json_decode($response->getBody()->getContents(), true);
             
-            $status = $data['status'] ?? 'UNKNOWN';
-            $mappedStatus = $this->mapWahaStatusToUazapi($status);
+            // Status original do WAHA
+            $wahaStatus = $data['status'] ?? 'UNKNOWN';
             
-            // Se status for FAILED, retornar warning em vez de erro
-            if ($status === 'FAILED') {
-                Logger::warning('WAHA session is in FAILED status', [
-                    'external_id' => $externalInstanceId,
-                    'status' => $status
-                ]);
-                
-                return [
-                    'success' => true,
-                    'message' => 'Sessão em estado FAILED - precisa ser reiniciada',
-                    'connected' => false,
-                    'loggedIn' => false,
-                    'jid' => null,
-                    'status' => $mappedStatus,
-                    'needs_restart' => true,
-                    'warnings' => ['Session status is FAILED - restart required']
+            // Traduzir para formato padronizado
+            $standardStatus = $this->mapWahaStatusToStandard($wahaStatus);
+            
+            // WORKING sempre traduz para connected
+            $isConnected = ($standardStatus === 'connected' || $wahaStatus === 'WORKING');
+            $isLoggedIn = $isConnected;
+            
+            // Extrair informações do perfil
+            $me = $data['me'] ?? [];
+            $jid = $me['jid'] ?? $data['jid'] ?? null;
+            $meId = $me['id'] ?? null; // ID do WhatsApp (ex: 558498537596@c.us)
+            $profileName = $me['pushName'] ?? $me['name'] ?? null;
+            $profilePicUrl = $me['profilePictureUrl'] ?? null;
+            
+            // Preparar objeto JID completo
+            $jidObject = null;
+            if ($jid || $meId) {
+                $jidObject = [
+                    'jid' => $jid,
+                    'id' => $meId, // ID do WhatsApp (formato @c.us)
                 ];
+                // Remover valores null
+                $jidObject = array_filter($jidObject, function($value) {
+                    return $value !== null;
+                });
             }
             
-            Logger::info('WAHA status retrieved', [
+            // Preparar resposta padronizada
+            $standardResponse = [
+                'success' => true,
+                'status' => $standardStatus,
+                'connected' => $isConnected,
+                'loggedIn' => $isLoggedIn,
+                'jid' => $jidObject,
+                'profile_name' => $profileName,
+                'profile_pic_url' => $profilePicUrl,
+                'provider_status' => $wahaStatus, // Status original WAHA
+                'provider_status_description' => $this->getWahaStatusDescription($wahaStatus)
+            ];
+            
+            // Se status for scan_qr_code, buscar QR code
+            if ($standardStatus === 'scan_qr_code') {
+                try {
+                    $qrProvider = new \App\Providers\Waha\WahaQrProvider($this->client, $this->baseUrl, $this->apiKey);
+                    $qrResult = $qrProvider->getQRCode($externalInstanceId);
+                    if ($qrResult['success'] && !empty($qrResult['qrcode'])) {
+                        $standardResponse['qrcode'] = $qrResult['qrcode'];
+                    }
+                } catch (\Exception $e) {
+                    Logger::debug('Failed to get QR code in status check', [
+                        'external_id' => $externalInstanceId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            Logger::info('WAHA status retrieved and translated', [
                 'external_id' => $externalInstanceId,
-                'status' => $status,
-                'mapped_status' => $mappedStatus
+                'waha_status' => $wahaStatus,
+                'standard_status' => $standardStatus,
+                'is_connected' => $isConnected
             ]);
             
-            return [
-                'success' => true,
-                'connected' => $mappedStatus === 'connected',
-                'loggedIn' => $mappedStatus === 'connected',
-                'jid' => $data['jid'] ?? null,
-                'status' => $mappedStatus,
-                'data' => $data
-            ];
+            return $standardResponse;
             
         } catch (GuzzleException $e) {
             Logger::error('WAHA get status failed', [
@@ -458,17 +503,42 @@ class WahaInstanceProvider
     }
     
     /**
-     * Mapear status WAHA para UAZAPI
+     * Mapear status WAHA para formato padronizado do backend
+     * 
+     * Status WAHA possíveis:
+     * - STOPPED: sessão parada
+     * - STARTING: sessão iniciando
+     * - SCAN_QR_CODE: aguardando escaneamento do QR code
+     * - WORKING: sessão funcionando (sempre traduz para "connected")
+     * - FAILED: sessão falhou (precisa reiniciar)
+     * 
+     * @param string $wahaStatus Status retornado pela WAHA
+     * @return string Status padronizado (stopped, connecting, scan_qr_code, connected, failed)
      */
-    private function mapWahaStatusToUazapi(string $wahaStatus): string
+    private function mapWahaStatusToStandard(string $wahaStatus): string
     {
         return match ($wahaStatus) {
-            'WORKING' => 'connected',
+            'WORKING' => 'connected',        // Sempre traduzir WORKING para connected
             'STARTING' => 'connecting',
-            'SCAN_QR_CODE' => 'connecting',
-            'STOPPED' => 'disconnected',
-            'FAILED' => 'disconnected',
-            default => 'disconnected',
+            'SCAN_QR_CODE' => 'scan_qr_code', // Status específico para QR code
+            'STOPPED' => 'stopped',
+            'FAILED' => 'failed',
+            default => 'unknown',
+        };
+    }
+    
+    /**
+     * Obter descrição legível do status WAHA
+     */
+    private function getWahaStatusDescription(string $wahaStatus): string
+    {
+        return match ($wahaStatus) {
+            'STOPPED' => 'Sessão parada',
+            'STARTING' => 'Sessão iniciando',
+            'SCAN_QR_CODE' => 'Aguardando escaneamento do QR code',
+            'WORKING' => 'Sessão conectada e funcionando',
+            'FAILED' => 'Sessão falhou - precisa reiniciar',
+            default => 'Status desconhecido',
         };
     }
 }
